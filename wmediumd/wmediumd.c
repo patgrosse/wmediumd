@@ -330,7 +330,9 @@ int send_tx_info_frame_nl(struct wmediumd *ctx,
 
 	msg = nlmsg_alloc();
 	if (!msg) {
-		printf("Error allocating new message MSG!\n");
+		if (ctx->log_error) {
+			printf("Error allocating new message MSG!\n");
+		}
 		return -1;
 	}
 
@@ -338,7 +340,9 @@ int send_tx_info_frame_nl(struct wmediumd *ctx,
 			genl_family_get_id(ctx->family), 0,
 			NLM_F_REQUEST, HWSIM_CMD_TX_INFO_FRAME,
 			VERSION_NR) == NULL) {
-		printf("%s: genlmsg_put failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: genlmsg_put failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
@@ -351,14 +355,18 @@ int send_tx_info_frame_nl(struct wmediumd *ctx,
 		    IEEE80211_TX_MAX_RATES * sizeof(struct hwsim_tx_rate),
 		    tx_attempts) ||
 	    nla_put_u64(msg, HWSIM_ATTR_COOKIE, cookie)) {
-		printf("%s: Failed to fill a payload\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: Failed to fill a payload\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
 
 	ret = nl_send_auto_complete(sock, msg);
 	if (ret < 0) {
-		printf("%s: nl_send_auto failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: nl_send_auto failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
@@ -381,7 +389,9 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 
 	msg = nlmsg_alloc();
 	if (!msg) {
-		printf("Error allocating new message MSG!\n");
+		if (ctx->log_error) {
+			printf("Error allocating new message MSG!\n");
+		}
 		return -1;
 	}
 
@@ -389,7 +399,9 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 			genl_family_get_id(ctx->family), 0,
 			NLM_F_REQUEST, HWSIM_CMD_FRAME,
 			VERSION_NR) == NULL) {
-		printf("%s: genlmsg_put failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: genlmsg_put failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
@@ -399,17 +411,23 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 	    nla_put(msg, HWSIM_ATTR_FRAME, data_len, data) ||
 	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, 1) ||
 	    nla_put_u32(msg, HWSIM_ATTR_SIGNAL, -50)) {
-		printf("%s: Failed to fill a payload\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: Failed to fill a payload\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
 
-	printf("cloned msg dest " MAC_FMT " (radio: " MAC_FMT ") len %d\n",
-	       MAC_ARGS(dst->addr), MAC_ARGS(dst->hwaddr), data_len);
+	if (ctx->log_info) {
+		printf("cloned msg dest " MAC_FMT " (radio: " MAC_FMT ") len %d\n",
+			   MAC_ARGS(dst->addr), MAC_ARGS(dst->hwaddr), data_len);
+	}
 
 	ret = nl_send_auto_complete(sock, msg);
 	if (ret < 0) {
-		printf("%s: nl_send_auto failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: nl_send_auto failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
@@ -448,9 +466,11 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 							    rate_idx, frame->data_len);
 
 				if (drand48() <= error_prob) {
-					printf("Dropped mcast from "
-					       MAC_FMT " to " MAC_FMT " at receiver\n",
-					       MAC_ARGS(src), MAC_ARGS(station->addr));
+					if (ctx->log_drops) {
+						printf("Dropped mcast from "
+							   MAC_FMT " to " MAC_FMT " at receiver\n",
+							   MAC_ARGS(src), MAC_ARGS(station->addr));
+					}
 					continue;
 				}
 
@@ -505,25 +525,32 @@ void deliver_expired_frames(struct wmediumd *ctx)
 				q_ct[i]++;
 			}
 		}
-		printf("[" TIME_FMT "] Station " MAC_FMT
-		       " BK %d BE %d VI %d VO %d\n",
-		       TIME_ARGS(&now), MAC_ARGS(station->addr),
-		       q_ct[IEEE80211_AC_BK], q_ct[IEEE80211_AC_BE],
-		       q_ct[IEEE80211_AC_VI], q_ct[IEEE80211_AC_VO]);
+		if (ctx->log_info) {
+			printf("[" TIME_FMT "] Station " MAC_FMT
+				   " BK %d BE %d VI %d VO %d\n",
+				   TIME_ARGS(&now), MAC_ARGS(station->addr),
+				   q_ct[IEEE80211_AC_BK], q_ct[IEEE80211_AC_BE],
+				   q_ct[IEEE80211_AC_VI], q_ct[IEEE80211_AC_VO]);
+		}
 
 		for (i = 0; i < IEEE80211_NUM_ACS; i++)
 			deliver_expired_frames_queue(ctx, &station->queues[i].frames, &now);
 	}
-	printf("\n\n");
+	if (ctx->log_info) {
+		printf("\n\n");
+	}
 }
 
 static
 int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
 {
 	struct genlmsghdr *gnlh = nlmsg_data(&nlerr->msg);
+	struct wmediumd *ctx = arg;
 
-	fprintf(stderr, "nl: cmd %d, seq %d: %s\n", gnlh->cmd,
-		nlerr->msg.nlmsg_seq, strerror(abs(nlerr->error)));
+	if (ctx->log_error) {
+		fprintf(stderr, "nl: cmd %d, seq %d: %s\n", gnlh->cmd,
+				nlerr->msg.nlmsg_seq, strerror(abs(nlerr->error)));
+	}
 
 	return NL_SKIP;
 }
@@ -572,7 +599,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 
 			sender = get_station_by_addr(ctx, src);
 			if (!sender) {
-				fprintf(stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
+				if (ctx->log_error) {
+					fprintf(stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
+				}
 				goto out;
 			}
 			memcpy(sender->hwaddr, hwaddr, ETH_ALEN);
@@ -608,7 +637,9 @@ int send_register_msg(struct wmediumd *ctx)
 
 	msg = nlmsg_alloc();
 	if (!msg) {
-		printf("Error allocating new message MSG!\n");
+		if (ctx->log_error) {
+			printf("Error allocating new message MSG!\n");
+		}
 		return -1;
 	}
 
@@ -616,14 +647,18 @@ int send_register_msg(struct wmediumd *ctx)
 			genl_family_get_id(ctx->family), 0,
 			NLM_F_REQUEST, HWSIM_CMD_REGISTER,
 			VERSION_NR) == NULL) {
-		printf("%s: genlmsg_put failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: genlmsg_put failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
 
 	ret = nl_send_auto_complete(sock, msg);
 	if (ret < 0) {
-		printf("%s: nl_send_auto failed\n", __func__);
+		if (ctx->log_error) {
+			printf("%s: nl_send_auto failed\n", __func__);
+		}
 		ret = -1;
 		goto out;
 	}
@@ -651,13 +686,17 @@ static int init_netlink(struct wmediumd *ctx)
 
 	ctx->cb = nl_cb_alloc(NL_CB_CUSTOM);
 	if (!ctx->cb) {
-		printf("Error allocating netlink callbacks\n");
+		if (ctx->log_error) {
+			printf("Error allocating netlink callbacks\n");
+		}
 		return -1;
 	}
 
 	sock = nl_socket_alloc_cb(ctx->cb);
 	if (!sock) {
-		printf("Error allocating netlink socket\n");
+		if (ctx->log_error) {
+			printf("Error allocating netlink socket\n");
+		}
 		return -1;
 	}
 
@@ -665,20 +704,26 @@ static int init_netlink(struct wmediumd *ctx)
 
 	ret = genl_connect(sock);
 	if (ret < 0) {
-		printf("Error connecting netlink socket ret=%d\n", ret);
+		if (ctx->log_error) {
+			printf("Error connecting netlink socket ret=%d\n", ret);
+		}
 		return -1;
 	}
 
 	ret = genl_ctrl_alloc_cache(sock, &ctx->cache);
 	if (ret < 0) {
-		printf("Error allocationg netlink cache ret=%d\n", ret);
+		if (ctx->log_error) {
+			printf("Error allocationg netlink cache ret=%d\n", ret);
+		}
 		return -1;
 	}
 
 	ctx->family = genl_ctrl_search_by_name(ctx->cache, "MAC80211_HWSIM");
 
 	if (!ctx->family) {
-		printf("Family MAC80211_HWSIM not registered\n");
+		if (ctx->log_error) {
+			printf("Family MAC80211_HWSIM not registered\n");
+		}
 		return -1;
 	}
 
@@ -694,11 +739,18 @@ static int init_netlink(struct wmediumd *ctx)
 void print_help(int exval)
 {
 	printf("wmediumd v%s - a wireless medium simulator\n", VERSION_STR);
-	printf("wmediumd [-h] [-V] [-c FILE]\n\n");
+	printf("wmediumd [-h] [-V] [-l LOG_LVL] [-c FILE]\n\n");
 
 	printf("  -h              print this help and exit\n");
 	printf("  -V              print version and exit\n\n");
 
+	printf("  -l LOG_LVL      set the logging level\n");
+	printf("                  LOG_LVL:\n");
+	printf("                  q: quiet, do not log anything when running\n");
+	printf("                  e: error, only log errors\n");
+	printf("                  s: startup, log errors and startup msgs\n");
+	printf("                  d: drops, log errors and startup msgs and packet drops\n");
+	printf("                  f: full (default), log everything\n");
 	printf("  -c FILE         set input config file\n");
 
 	exit(exval);
@@ -727,7 +779,12 @@ int main(int argc, char *argv[])
 		print_help(EXIT_FAILURE);
 	}
 
-	while ((opt = getopt(argc, argv, "hVc:")) != -1) {
+	ctx.log_info = true;
+	ctx.log_drops = true;
+	ctx.log_startup = true;
+	ctx.log_error = true;
+
+	while ((opt = getopt(argc, argv, "hVc:l:")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help(EXIT_SUCCESS);
@@ -745,6 +802,26 @@ int main(int argc, char *argv[])
 			printf("wmediumd: Error - Option `%c' "
 			       "needs a value\n\n", optopt);
 			print_help(EXIT_FAILURE);
+			break;
+		case 'l':
+			switch(optarg[0]) {
+				case 'f':
+					break;
+				case 'q':
+					ctx.log_error = false;
+				case 'e':
+					ctx.log_startup = false;
+				case 's':
+					ctx.log_drops = false;
+				case 'd':
+					ctx.log_info = false;
+					break;
+				default:
+					printf("wmediumd: Error - No such logging setting: "
+								   "%c\n\n", optarg[0]);
+					print_help(EXIT_FAILURE);
+					break;
+			}
 			break;
 		case '?':
 			printf("wmediumd: Error - No such option: "
@@ -783,8 +860,11 @@ int main(int argc, char *argv[])
 	event_add(&ev_timer, NULL);
 
 	/* register for new frames */
-	if (send_register_msg(&ctx) == 0)
-		printf("REGISTER SENT!\n");
+	if (send_register_msg(&ctx) == 0) {
+		if (ctx.log_startup) {
+			printf("REGISTER SENT!\n");
+		}
+	}
 
 	/* enter libevent main loop */
 	event_dispatch();

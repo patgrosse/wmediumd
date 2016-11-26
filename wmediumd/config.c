@@ -59,10 +59,12 @@ int load_config(struct wmediumd *ctx, const char *file)
 
 	/*read the file*/
 	if (!config_read_file(cf, file)) {
-		printf("Error loading file %s at line:%d, reason: %s\n",
-		       file,
-		       config_error_line(cf),
-		       config_error_text(cf));
+		if (ctx->log_error) {
+			printf("Error loading file %s at line:%d, reason: %s\n",
+				file,
+				config_error_line(cf),
+				config_error_text(cf));
+		}
 		config_destroy(cf);
 		exit(EXIT_FAILURE);
 	}
@@ -70,7 +72,9 @@ int load_config(struct wmediumd *ctx, const char *file)
 	ids = config_lookup(cf, "ifaces.ids");
 	count_ids = config_setting_length(ids);
 
-	printf("#_if = %d\n", count_ids);
+	if (ctx->log_startup) {
+		printf("#_if = %d\n", count_ids);
+	}
 
 	/* Fill the mac_addr */
 	for (i = 0; i < count_ids; i++) {
@@ -80,7 +84,9 @@ int load_config(struct wmediumd *ctx, const char *file)
 
 		station = malloc(sizeof(*station));
 		if (!station) {
-			fprintf(stderr, "Out of memory!\n");
+			if (ctx->log_error) {
+				fprintf(stderr, "Out of memory!\n");
+			}
 			exit(1);
 		}
 		station->index = i;
@@ -89,14 +95,18 @@ int load_config(struct wmediumd *ctx, const char *file)
 		station_init_queues(station);
 		list_add_tail(&station->list, &ctx->stations);
 
-		printf("Added station %d: " MAC_FMT "\n", i, MAC_ARGS(addr));
+		if (ctx->log_startup) {
+			printf("Added station %d: " MAC_FMT "\n", i, MAC_ARGS(addr));
+		}
 	}
 	ctx->num_stas = count_ids;
 
 	/* create link quality matrix */
 	ctx->snr_matrix = calloc(sizeof(int), count_ids * count_ids);
 	if (!ctx->snr_matrix) {
-		fprintf(stderr, "Out of memory!\n");
+		if (ctx->log_error) {
+			fprintf(stderr, "Out of memory!\n");
+		}
 		exit(1);
 	}
 
@@ -111,7 +121,9 @@ int load_config(struct wmediumd *ctx, const char *file)
 
 		link = config_setting_get_elem(links, i);
 		if (config_setting_length(link) != 3) {
-			fprintf(stderr, "Invalid link: expected (int,int,int)\n");
+			if (ctx->log_error) {
+				fprintf(stderr, "Invalid link: expected (int,int,int)\n");
+			}
 			continue;
 		}
 		start = config_setting_get_int_elem(link, 0);
@@ -120,8 +132,10 @@ int load_config(struct wmediumd *ctx, const char *file)
 
 		if (start < 0 || start >= ctx->num_stas ||
 		    end < 0 || end >= ctx->num_stas) {
-			fprintf(stderr, "Invalid link [%d,%d,%d]: index out of range\n",
-				start, end, snr);
+			if (ctx->log_error) {
+				fprintf(stderr, "Invalid link [%d,%d,%d]: index out of range\n",
+						start, end, snr);
+            }
 			continue;
 		}
 		ctx->snr_matrix[ctx->num_stas * start + end] = snr;

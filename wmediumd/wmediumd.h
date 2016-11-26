@@ -76,6 +76,11 @@ struct wmediumd {
 	struct nl_cb *cb;
 	struct nl_cache *cache;
 	struct genl_family *family;
+
+	bool log_info;
+	bool log_drops;
+	bool log_startup;
+	bool log_error;
 };
 
 struct hwsim_tx_rate {
