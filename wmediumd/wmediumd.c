@@ -717,7 +717,7 @@ static int init_netlink(struct wmediumd *ctx)
 void print_help(int exval)
 {
 	printf("wmediumd v%s - a wireless medium simulator\n", VERSION_STR);
-	printf("wmediumd [-h] [-V] [-l LOG_LVL] [-c FILE]\n\n");
+	printf("wmediumd [-h] [-V] [-l LOG_LVL] -c FILE\n\n");
 
 	printf("  -h              print this help and exit\n");
 	printf("  -V              print version and exit\n\n");
