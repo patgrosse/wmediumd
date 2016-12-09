@@ -724,10 +724,10 @@ void print_help(int exval)
 
 	printf("  -l LOG_LVL      set the logging level\n");
 	printf("                  LOG_LVL: RFC 5424 severity, values 0 - 7\n");
-	printf("                  3 and below: errors are logged\n");
-	printf("                  5 and below: startup msgs are logged\n");
-	printf("                  6 and below: dropped packets are logged\n");
-	printf("                  7          : all packets will be logged\n");
+	printf("                  >= 3: errors are logged\n");
+	printf("                  >= 5: startup msgs are logged\n");
+	printf("                  >= 6: dropped packets are logged\n");
+	printf("                  == 7: all packets will be logged\n");
 	printf("  -c FILE         set input config file\n");
 
 	exit(exval);
