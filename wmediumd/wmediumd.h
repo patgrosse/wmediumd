@@ -47,6 +47,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include "list.h"
 #include "ieee80211.h"
@@ -76,6 +77,8 @@ struct wmediumd {
 	struct nl_cb *cb;
 	struct nl_cache *cache;
 	struct genl_family *family;
+
+	u8 log_lvl;
 };
 
 struct hwsim_tx_rate {
@@ -113,5 +116,7 @@ struct frame {
 
 void station_init_queues(struct station *station);
 double get_error_prob(double snr, unsigned int rate_idx, int frame_len);
+int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
+int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 
 #endif /* WMEDIUMD_H_ */
