@@ -807,7 +807,8 @@ int main(int argc, char *argv[])
 	w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
 
 	INIT_LIST_HEAD(&ctx.stations);
-	load_config(&ctx, config_file);
+	if (load_config(&ctx, config_file) != EXIT_SUCCESS)
+		return EXIT_FAILURE;
 
 	/* init libevent */
 	event_init();

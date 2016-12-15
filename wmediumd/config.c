@@ -64,10 +64,14 @@ int load_config(struct wmediumd *ctx, const char *file)
 				config_error_line(cf),
 				config_error_text(cf));
 		config_destroy(cf);
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	ids = config_lookup(cf, "ifaces.ids");
+	if (!ids) {
+		w_logf(ctx, LOG_ERR, "ids not found in config file\n");
+		return EXIT_FAILURE;
+	}
 	count_ids = config_setting_length(ids);
 
 	w_logf(ctx, LOG_NOTICE, "#_if = %d\n", count_ids);
@@ -81,7 +85,7 @@ int load_config(struct wmediumd *ctx, const char *file)
 		station = malloc(sizeof(*station));
 		if (!station) {
 			w_flogf(ctx, LOG_ERR, stderr, "Out of memory!\n");
-			exit(1);
+			return EXIT_FAILURE;
 		}
 		station->index = i;
 		memcpy(station->addr, addr, ETH_ALEN);
@@ -97,7 +101,7 @@ int load_config(struct wmediumd *ctx, const char *file)
 	ctx->snr_matrix = calloc(sizeof(int), count_ids * count_ids);
 	if (!ctx->snr_matrix) {
 		w_flogf(ctx, LOG_ERR, stderr, "Out of memory!\n");
-		exit(1);
+		return EXIT_FAILURE;
 	}
 
 	/* set default snrs */
