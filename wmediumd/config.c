@@ -21,6 +21,7 @@
  *	02110-1301, USA.
  */
 
+#include <sys/timerfd.h>
 #include <libconfig.h>
 #include <string.h>
 #include <stdlib.h>
@@ -136,10 +137,34 @@ static void recalc_path_loss(struct wmediumd *ctx)
 	}
 }
 
+static void move_stations_to_direction(struct wmediumd *ctx)
+{
+	struct station *station;
+	struct timespec now;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	if (!timespec_before(&ctx->next_move, &now))
+		return;
+
+	list_for_each_entry(station, &ctx->stations, list) {
+		station->x += station->dir_x;
+		station->y += station->dir_y;
+	}
+	recalc_path_loss(ctx);
+
+	clock_gettime(CLOCK_MONOTONIC, &ctx->next_move);
+	ctx->next_move.tv_sec += MOVE_INTERVAL;
+}
+
+static void move_stations_donothing(struct wmediumd *ctx)
+{
+}
+
 static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 {
 	struct station *station;
 	const config_setting_t *positions, *position;
+	const config_setting_t *directions, *direction;
 	const config_setting_t *tx_powers, *model_params;
 	const char *path_loss_model_name;
 
@@ -153,6 +178,16 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		w_flogf(ctx, LOG_ERR, stderr,
 			"Specify %d positions\n", ctx->num_stas);
 		return EXIT_FAILURE;
+	}
+
+	directions = config_lookup(cf, "path_loss.directions");
+	if (directions) {
+		if (config_setting_length(directions) != ctx->num_stas) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Specify %d directions\n", ctx->num_stas);
+			return EXIT_FAILURE;
+		}
+		ctx->move_stations = move_stations_to_direction;
 	}
 
 	tx_powers = config_lookup(cf, "path_loss.tx_powers");
@@ -211,6 +246,20 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		}
 		station->x = config_setting_get_float_elem(position, 0);
 		station->y = config_setting_get_float_elem(position, 1);
+
+		if (directions) {
+			direction = config_setting_get_elem(directions,
+				station->index);
+			if (config_setting_length(direction) != 2) {
+				w_flogf(ctx, LOG_ERR, stderr,
+					"Invalid direction: expected (double,double)\n");
+				return EXIT_FAILURE;
+			}
+			station->dir_x = config_setting_get_float_elem(
+				direction, 0);
+			station->dir_y = config_setting_get_float_elem(
+				direction, 1);
+		}
 
 		station->tx_power = config_setting_get_float_elem(
 			tx_powers, station->index);
@@ -389,6 +438,7 @@ int load_config(struct wmediumd *ctx, const char *file)
 	}
 
 	/* calculate signal from positions */
+	ctx->move_stations = move_stations_donothing;
 	if (path_loss && parse_path_loss(ctx, cf) != EXIT_SUCCESS)
 		goto fail;
 

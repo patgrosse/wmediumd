@@ -79,6 +79,7 @@ struct station {
 	u8 addr[ETH_ALEN];		/* virtual interface mac address */
 	u8 hwaddr[ETH_ALEN];		/* hardware address of hwsim radio */
 	double x, y;			/* position of the station [m] */
+	double dir_x, dir_y;		/* direction of the station [meter per MOVE_INTERVAL] */
 	int tx_power;			/* transmission power [dBm] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
@@ -96,6 +97,9 @@ struct wmediumd {
 	double *error_prob_matrix;
 	struct intf_info *intf;
 	struct timespec intf_updated;
+#define MOVE_INTERVAL	(3) /* station movement interval [sec] */
+	struct timespec next_move;
+	void *path_loss_param;
 
 	struct nl_cb *cb;
 	struct nl_cache *cache;
@@ -107,7 +111,7 @@ struct wmediumd {
 				 struct station *, struct station *);
 	int (*calc_path_loss)(void *, struct station *,
 			      struct station *);
-	void *path_loss_param;
+	void (*move_stations)(struct wmediumd *);
 
 	u8 log_lvl;
 };
@@ -146,6 +150,7 @@ struct intf_info {
 void station_init_queues(struct station *station);
 double get_error_prob_from_snr(double snr, unsigned int rate_idx,
 			       int frame_len);
+bool timespec_before(struct timespec *t1, struct timespec *t2);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 

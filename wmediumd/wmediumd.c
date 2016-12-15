@@ -862,6 +862,7 @@ static void timer_cb(int fd, short what, void *data)
 {
 	struct wmediumd *ctx = data;
 
+	ctx->move_stations(ctx);
 	deliver_expired_frames(ctx);
 	rearm_timer(ctx);
 }
@@ -949,6 +950,8 @@ int main(int argc, char *argv[])
 	/* setup timers */
 	ctx.timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
 	clock_gettime(CLOCK_MONOTONIC, &ctx.intf_updated);
+	clock_gettime(CLOCK_MONOTONIC, &ctx.next_move);
+	ctx.next_move.tv_sec += MOVE_INTERVAL;
 	event_set(&ev_timer, ctx.timerfd, EV_READ | EV_PERSIST, timer_cb, &ctx);
 	event_add(&ev_timer, NULL);
 
