@@ -874,6 +874,7 @@ int main(int argc, char *argv[])
 	struct event ev_timer;
 	struct wmediumd ctx;
 	char *config_file = NULL;
+	char *per_file = NULL;
 
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
@@ -886,7 +887,7 @@ int main(int argc, char *argv[])
 	unsigned long int parse_log_lvl;
 	char* parse_end_token;
 
-	while ((opt = getopt(argc, argv, "hVc:l:")) != -1) {
+	while ((opt = getopt(argc, argv, "hVc:x:")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help(EXIT_SUCCESS);
@@ -898,6 +899,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'c':
 			config_file = optarg;
+			break;
+		case 'x':
+			printf("Input packet error rate file: %s\n", optarg);
+			per_file = optarg;
 			break;
 		case ':':
 			printf("wmediumd: Error - Option `%c' "
@@ -933,7 +938,7 @@ int main(int argc, char *argv[])
 	w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
 
 	INIT_LIST_HEAD(&ctx.stations);
-	if (load_config(&ctx, config_file) != EXIT_SUCCESS)
+	if (load_config(&ctx, config_file, per_file) != EXIT_SUCCESS)
 		return EXIT_FAILURE;
 
 	/* init libevent */
@@ -968,6 +973,7 @@ int main(int argc, char *argv[])
 	free(ctx.cache);
 	free(ctx.family);
 	free(ctx.intf);
+	free(ctx.per_matrix);
 
 	return EXIT_SUCCESS;
 }
