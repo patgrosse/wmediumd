@@ -262,7 +262,7 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 		if (deststa)
 			snr = ctx->get_link_snr(ctx, station, deststa);
 	}
-	frame->signal = snr;
+	frame->signal = snr + NOISE_LEVEL;
 
 	noack = frame_is_mgmt(frame) || is_multicast_ether_addr(dest);
 	double choice = -3.14;
@@ -459,7 +459,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				continue;
 
 			if (is_multicast_ether_addr(dest)) {
-				int signal, rate_idx;
+				int snr, rate_idx;
 				double error_prob;
 
 				/*
@@ -467,13 +467,12 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				 * reverse link from sender -- check for
 				 * each receiver.
 				 */
-				signal = ctx->get_link_snr(ctx, frame->sender,
-							   station);
+				snr = ctx->get_link_snr(ctx, frame->sender,
+							station);
 				rate_idx = frame->tx_rates[0].idx;
 				error_prob = ctx->get_error_prob(ctx,
-					(double)signal, rate_idx,
-					frame->data_len, frame->sender,
-					station);
+					(double)snr, rate_idx, frame->data_len,
+					frame->sender, station);
 
 				if (drand48() <= error_prob) {
 					w_logf(ctx, LOG_INFO, "Dropped mcast from "
@@ -485,7 +484,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
-						      1, signal);
+						      1, snr + NOISE_LEVEL);
 
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				send_cloned_frame_msg(ctx, station,
