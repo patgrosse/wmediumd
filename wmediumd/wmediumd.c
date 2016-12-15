@@ -129,8 +129,12 @@ void rearm_timer(struct wmediumd *ctx)
 			}
 		}
 	}
-	expires.it_value = min_expires;
-	timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &expires, NULL);
+
+	if (set_min_expires) {
+		expires.it_value = min_expires;
+		timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &expires,
+				NULL);
+	}
 }
 
 static inline bool frame_has_a4(struct frame *frame)
@@ -206,13 +210,6 @@ static struct station *get_station_by_addr(struct wmediumd *ctx, u8 *addr)
 	return NULL;
 }
 
-static int get_link_snr(struct wmediumd *ctx,
-			struct station *sender,
-			struct station *receiver)
-{
-	return ctx->snr_matrix[sender->index * ctx->num_stas + receiver->index];
-}
-
 void queue_frame(struct wmediumd *ctx, struct station *station,
 		 struct frame *frame)
 {
@@ -221,7 +218,7 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 	struct timespec now, target;
 	struct wqueue *queue;
 	struct frame *tail;
-	struct station *tmpsta;
+	struct station *tmpsta, *deststa;
 	int send_time;
 	int cw;
 	double error_prob;
@@ -258,15 +255,20 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 
 	int snr = SNR_DEFAULT;
 
-	if (!is_multicast_ether_addr(dest)) {
-		struct station *deststa = get_station_by_addr(ctx, dest);
+	if (is_multicast_ether_addr(dest)) {
+		deststa = NULL;
+	} else {
+		deststa = get_station_by_addr(ctx, dest);
 		if (deststa)
-			snr = get_link_snr(ctx, station, deststa);
+			snr = ctx->get_link_snr(ctx, station, deststa);
 	}
 	frame->signal = snr;
 
 	noack = frame_is_mgmt(frame) || is_multicast_ether_addr(dest);
 	double choice = -3.14;
+
+	if (use_fixed_random_value(ctx))
+		choice = drand48();
 
 	for (i = 0; i < frame->tx_rates_count && !is_acked; i++) {
 
@@ -276,9 +278,13 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 		if (rate_idx < 0)
 			break;
 
-		error_prob = get_error_prob(snr, rate_idx, frame->data_len);
+		error_prob = ctx->get_error_prob(ctx, snr, rate_idx,
+						 frame->data_len, station,
+						 deststa);
 		for (j = 0; j < frame->tx_rates[i].count; j++) {
 			int rate = index_to_rate[rate_idx];
+			if (rate == 0) // avoid division by zero
+				continue;
 			send_time += difs + pkt_duration(frame->data_len, rate);
 
 			retries++;
@@ -298,7 +304,8 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 				if (cw > queue->cw_max)
 					cw = queue->cw_max;
 			}
-			choice = drand48();
+			if (!use_fixed_random_value(ctx))
+				choice = drand48();
 			if (choice > error_prob) {
 				is_acked = true;
 				break;
@@ -460,10 +467,13 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				 * reverse link from sender -- check for
 				 * each receiver.
 				 */
-				signal = get_link_snr(ctx, station, frame->sender);
+				signal = ctx->get_link_snr(ctx, frame->sender,
+							   station);
 				rate_idx = frame->tx_rates[0].idx;
-				error_prob = get_error_prob((double)signal,
-							    rate_idx, frame->data_len);
+				error_prob = ctx->get_error_prob(ctx,
+					(double)signal, rate_idx,
+					frame->data_len, frame->sender,
+					station);
 
 				if (drand48() <= error_prob) {
 					w_logf(ctx, LOG_INFO, "Dropped mcast from "

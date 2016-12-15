@@ -65,27 +65,6 @@ typedef uint64_t u64;
 #define min(x,y) ((x) < (y) ? (x) : (y))
 #endif
 
-struct wmediumd {
-	int timerfd;
-
-	struct nl_sock *sock;
-
-	int num_stas;
-	struct list_head stations;
-	int *snr_matrix;
-
-	struct nl_cb *cb;
-	struct nl_cache *cache;
-	struct genl_family *family;
-
-	u8 log_lvl;
-};
-
-struct hwsim_tx_rate {
-	signed char idx;
-	unsigned char count;
-};
-
 struct wqueue {
 	struct list_head frames;
 	int cw_min;
@@ -98,6 +77,33 @@ struct station {
 	u8 hwaddr[ETH_ALEN];		/* hardware address of hwsim radio */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
+};
+
+struct wmediumd {
+	int timerfd;
+
+	struct nl_sock *sock;
+
+	int num_stas;
+	struct list_head stations;
+	int *snr_matrix;
+	double *error_prob_matrix;
+
+	struct nl_cb *cb;
+	struct nl_cache *cache;
+	struct genl_family *family;
+
+	int (*get_link_snr)(struct wmediumd *, struct station *,
+			    struct station *);
+	double (*get_error_prob)(struct wmediumd *, double, unsigned int, int,
+				 struct station *, struct station *);
+
+	u8 log_lvl;
+};
+
+struct hwsim_tx_rate {
+	signed char idx;
+	unsigned char count;
 };
 
 struct frame {
@@ -115,7 +121,8 @@ struct frame {
 };
 
 void station_init_queues(struct station *station);
-double get_error_prob(double snr, unsigned int rate_idx, int frame_len);
+double get_error_prob_from_snr(double snr, unsigned int rate_idx,
+			       int frame_len);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 
