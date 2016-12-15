@@ -339,10 +339,12 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 		deststa = NULL;
 	} else {
 		deststa = get_station_by_addr(ctx, dest);
-		if (deststa)
+		if (deststa) {
 			snr = ctx->get_link_snr(ctx, station, deststa) -
 				get_signal_offset_by_interference(ctx,
 					station->index, deststa->index);
+			snr += ctx->get_fading_signal(ctx);
+		}
 	}
 	frame->signal = snr + NOISE_LEVEL;
 
@@ -552,6 +554,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				 */
 				snr = ctx->get_link_snr(ctx, frame->sender,
 							station);
+				snr += ctx->get_fading_signal(ctx);
 				signal = snr + NOISE_LEVEL;
 
 				if (set_interference_duration(ctx,

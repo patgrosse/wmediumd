@@ -103,6 +103,7 @@ struct wmediumd {
 	float *per_matrix;
 	int per_matrix_row_num;
 	int per_matrix_signal_min;
+	int fading_coefficient;
 
 	struct nl_cb *cb;
 	struct nl_cache *cache;
@@ -115,6 +116,7 @@ struct wmediumd {
 	int (*calc_path_loss)(void *, struct station *,
 			      struct station *);
 	void (*move_stations)(struct wmediumd *);
+	int (*get_fading_signal)(struct wmediumd *);
 
 	u8 log_lvl;
 };
