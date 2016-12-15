@@ -65,6 +65,8 @@ typedef uint64_t u64;
 #define min(x,y) ((x) < (y) ? (x) : (y))
 #endif
 
+#define NOISE_LEVEL (-91)
+
 struct wqueue {
 	struct list_head frames;
 	int cw_min;
@@ -75,6 +77,8 @@ struct station {
 	int index;
 	u8 addr[ETH_ALEN];		/* virtual interface mac address */
 	u8 hwaddr[ETH_ALEN];		/* hardware address of hwsim radio */
+	double x, y;			/* position of the station [m] */
+	int tx_power;			/* transmission power [dBm] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
 };
@@ -86,6 +90,7 @@ struct wmediumd {
 
 	int num_stas;
 	struct list_head stations;
+	struct station **sta_array;
 	int *snr_matrix;
 	double *error_prob_matrix;
 
@@ -97,6 +102,9 @@ struct wmediumd {
 			    struct station *);
 	double (*get_error_prob)(struct wmediumd *, double, unsigned int, int,
 				 struct station *, struct station *);
+	int (*calc_path_loss)(void *, struct station *,
+			      struct station *);
+	void *path_loss_param;
 
 	u8 log_lvl;
 };
@@ -118,6 +126,11 @@ struct frame {
 	struct hwsim_tx_rate tx_rates[IEEE80211_TX_MAX_RATES];
 	size_t data_len;
 	u8 data[0];			/* frame contents */
+};
+
+struct log_distance_model_param {
+	double path_loss_exponent;
+	double Xg;
 };
 
 void station_init_queues(struct station *station);
