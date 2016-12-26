@@ -57,13 +57,6 @@ static int get_link_snr_from_snr_matrix(struct wmediumd *ctx,
 	return ctx->snr_matrix[sender->index * ctx->num_stas + receiver->index];
 }
 
-static double _get_error_prob_from_snr(struct wmediumd *ctx, double snr,
-				       unsigned int rate_idx, int frame_len,
-				       struct station *src, struct station *dst)
-{
-	return get_error_prob_from_snr(snr, rate_idx, frame_len);
-}
-
 static double get_error_prob_from_matrix(struct wmediumd *ctx, double snr,
 					 unsigned int rate_idx, int frame_len,
 					 struct station *src,
@@ -404,9 +397,13 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 			"per_file and error_probs could not be used at the same time\n");
 		goto fail;
 	}
+	if (!per_file && !error_probs) {
+		w_flogf(ctx, LOG_ERR, stderr,
+			"Specify packet error rate file(default is tests/signal_table_ieee80211ax) or error_probs.\n");
+		goto fail;
+	}
 
 	ctx->get_link_snr = get_link_snr_from_snr_matrix;
-	ctx->get_error_prob = _get_error_prob_from_snr;
 
 	ctx->per_matrix = NULL;
 	ctx->per_matrix_row_num = 0;

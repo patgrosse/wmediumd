@@ -36,7 +36,7 @@ path_loss :
 {
 	positions = (
 		(-50.0,   0.0),
-		(  0.0,  10.0),
+		(  0.0,  20.0),
 		(  0.0,   0.0),
 		( 50.0,   0.0)
 	);
@@ -92,7 +92,7 @@ winct=$i
 win=$session:$((winct+1)).0
 winct=$((winct+1))
 tmux new-window -a -t $session -n wmediumd
-tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg' C-m
+tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
 
 # start iperf server on 10.10.10.13
 tmux send-keys -t $session:4 'iperf -s' C-m

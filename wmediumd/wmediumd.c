@@ -880,6 +880,7 @@ int main(int argc, char *argv[])
 	char *config_file = NULL;
 	char *per_file = NULL;
 
+	memset(&ctx, 0, sizeof(ctx));
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
 	if (argc == 1) {
