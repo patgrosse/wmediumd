@@ -845,7 +845,7 @@ static int init_netlink(struct wmediumd *ctx)
 void print_help(int exval)
 {
 	printf("wmediumd v%s - a wireless medium simulator\n", VERSION_STR);
-	printf("wmediumd [-h] [-V] [-l LOG_LVL] -c FILE\n\n");
+	printf("wmediumd [-h] [-V] [-l LOG_LVL] [-x FILE] -c FILE \n\n");
 
 	printf("  -h              print this help and exit\n");
 	printf("  -V              print version and exit\n\n");
@@ -857,6 +857,7 @@ void print_help(int exval)
 	printf("                  >= 6: dropped packets are logged\n");
 	printf("                  == 7: all packets will be logged\n");
 	printf("  -c FILE         set input config file\n");
+	printf("  -x FILE         set input PER file\n");
 
 	exit(exval);
 }
