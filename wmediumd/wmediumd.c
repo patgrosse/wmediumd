@@ -129,8 +129,12 @@ void rearm_timer(struct wmediumd *ctx)
 			}
 		}
 	}
-	expires.it_value = min_expires;
-	timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &expires, NULL);
+
+	if (set_min_expires) {
+		expires.it_value = min_expires;
+		timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &expires,
+				NULL);
+	}
 }
 
 static inline bool frame_has_a4(struct frame *frame)
