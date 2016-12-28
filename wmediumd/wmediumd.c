@@ -54,8 +54,8 @@ static inline int pkt_duration(int len, int rate)
 
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...)
 {
-    va_list(args);
-    va_start(args, format);
+	va_list(args);
+	va_start(args, format);
 	if (ctx->log_lvl >= level) {
 		return vprintf(format, args);
 	}
@@ -64,8 +64,8 @@ int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...)
 
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...)
 {
-    va_list(args);
-    va_start(args, format);
+	va_list(args);
+	va_start(args, format);
 	if (ctx->log_lvl >= level) {
 		return vfprintf(stream, format, args);
 	}
