@@ -290,13 +290,14 @@ static int get_no_fading_signal(struct wmediumd *ctx)
 int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 {
 	config_t cfg, *cf;
-	const config_setting_t *ids, *links, *path_loss;
+	const config_setting_t *ids, *links, *model_type, *path_loss;
 	const config_setting_t *error_probs, *error_prob;
 	const config_setting_t *enable_interference;
 	const config_setting_t *fading_coefficient;
 	int count_ids, i, j;
 	int start, end, snr;
 	struct station *station;
+	const char *model_type_str;
 
 	/*initialize the config file*/
 	cf = &cfg;
@@ -366,7 +367,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	}
 
 	fading_coefficient =
-		config_lookup(cf, "ifaces.fading_coefficient");
+		config_lookup(cf, "model.fading_coefficient");
 	if (fading_coefficient &&
 	    config_setting_get_int(fading_coefficient) > 0) {
 		ctx->get_fading_signal = _get_fading_signal;
@@ -378,6 +379,15 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	}
 
 	links = config_lookup(cf, "ifaces.links");
+	if (!links) {
+		model_type = config_lookup(cf, "model.type");
+		if (model_type) {
+			model_type_str = config_setting_get_string(model_type);
+			if (memcmp("snr", model_type_str, strlen("snr")) == 0) {
+				links = config_lookup(cf, "model.links");
+			}
+		}
+	}
 	error_probs = config_lookup(cf, "ifaces.error_probs");
 
 	path_loss = config_lookup(cf, "path_loss");
