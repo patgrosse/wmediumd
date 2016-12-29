@@ -33,8 +33,9 @@ ifaces :
 	];
 };
 
-path_loss :
+model :
 {
+	type = "path_loss";
 	positions = (
 		(-50.0,   0.0),
 		(  0.0,  70.0),
@@ -48,7 +49,10 @@ path_loss :
 		(  0.0,   0.0)
 	);
 	tx_powers = (15.0, 15.0, 15.0, 15.0);
-	model_params = ("log_distance", 3.5, 0.0);
+
+	model_name = "log_distance";
+	path_loss_exp = 3.5;
+	xg = 0.0;
 };
 __EOM
 

@@ -158,13 +158,13 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 	struct station *station;
 	const config_setting_t *positions, *position;
 	const config_setting_t *directions, *direction;
-	const config_setting_t *tx_powers, *model_params;
+	const config_setting_t *tx_powers, *model;
 	const char *path_loss_model_name;
 
-	positions = config_lookup(cf, "path_loss.positions");
+	positions = config_lookup(cf, "model.positions");
 	if (!positions) {
 		w_flogf(ctx, LOG_ERR, stderr,
-			"No positions found in path_loss\n");
+			"No positions found in model\n");
 		return EXIT_FAILURE;
 	}
 	if (config_setting_length(positions) != ctx->num_stas) {
@@ -173,7 +173,7 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		return EXIT_FAILURE;
 	}
 
-	directions = config_lookup(cf, "path_loss.directions");
+	directions = config_lookup(cf, "model.directions");
 	if (directions) {
 		if (config_setting_length(directions) != ctx->num_stas) {
 			w_flogf(ctx, LOG_ERR, stderr,
@@ -183,10 +183,10 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		ctx->move_stations = move_stations_to_direction;
 	}
 
-	tx_powers = config_lookup(cf, "path_loss.tx_powers");
+	tx_powers = config_lookup(cf, "model.tx_powers");
 	if (!tx_powers) {
 		w_flogf(ctx, LOG_ERR, stderr,
-			"No tx_powers found in path_loss\n");
+			"No tx_powers found in model\n");
 		return EXIT_FAILURE;
 	}
 	if (config_setting_length(tx_powers) != ctx->num_stas) {
@@ -195,23 +195,16 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		return EXIT_FAILURE;
 	}
 
-	model_params = config_lookup(cf, "path_loss.model_params");
-	if (!model_params) {
-		w_flogf(ctx, LOG_ERR, stderr,
-			"No model_params found in path_loss\n");
+	model = config_lookup(cf, "model");
+	if (config_setting_lookup_string(model, "model_name",
+		&path_loss_model_name) != CONFIG_TRUE) {
+		w_flogf(ctx, LOG_ERR, stderr, "Specify model_name\n");
 		return EXIT_FAILURE;
 	}
-
-	path_loss_model_name = config_setting_get_string_elem(model_params, 0);
 	if (strncmp(path_loss_model_name, "log_distance",
 		    sizeof("log_distance")) == 0) {
 		struct log_distance_model_param *param;
 
-		if (config_setting_length(model_params) < 3) {
-			w_flogf(ctx, LOG_ERR, stderr,
-				"log distance path loss model requires two parameters\n");
-			return EXIT_FAILURE;
-		}
 		ctx->calc_path_loss = calc_path_loss_log_distance;
 
 		param = malloc(sizeof(*param));
@@ -221,9 +214,18 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 			return EXIT_FAILURE;
 		}
 
-		param->path_loss_exponent =
-			config_setting_get_float_elem(model_params, 1);
-		param->Xg = config_setting_get_float_elem(model_params, 2);
+		if (config_setting_lookup_float(model, "path_loss_exp",
+			&param->path_loss_exponent) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"path_loss_exponent not found\n");
+			return EXIT_FAILURE;
+		}
+
+		if (config_setting_lookup_float(model, "xg",
+			&param->Xg) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr, "xg not found\n");
+			return EXIT_FAILURE;
+		}
 		ctx->path_loss_param = param;
 	} else {
 		w_flogf(ctx, LOG_ERR, stderr, "No path loss model found\n");
@@ -290,7 +292,7 @@ static int get_no_fading_signal(struct wmediumd *ctx)
 int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 {
 	config_t cfg, *cf;
-	const config_setting_t *ids, *links, *model_type, *path_loss;
+	const config_setting_t *ids, *links, *model_type;
 	const config_setting_t *error_probs = NULL, *error_prob;
 	const config_setting_t *enable_interference;
 	const config_setting_t *fading_coefficient, *default_prob;
@@ -379,6 +381,18 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 		ctx->fading_coefficient = 0;
 	}
 
+	ctx->move_stations = move_stations_donothing;
+
+	/* create link quality matrix */
+	ctx->snr_matrix = calloc(sizeof(int), count_ids * count_ids);
+	if (!ctx->snr_matrix) {
+		w_flogf(ctx, LOG_ERR, stderr, "Out of memory(snr_matrix)\n");
+		return EXIT_FAILURE;
+	}
+	/* set default snrs */
+	for (i = 0; i < count_ids * count_ids; i++)
+		ctx->snr_matrix[i] = SNR_DEFAULT;
+
 	links = config_lookup(cf, "ifaces.links");
 	if (!links) {
 		model_type = config_lookup(cf, "model.type");
@@ -389,20 +403,13 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 			} else if (memcmp("prob", model_type_str,
 				strlen("prob")) == 0) {
 				error_probs = config_lookup(cf, "model.links");
+			} else if (memcmp("path_loss", model_type_str,
+				strlen("path_loss")) == 0) {
+				/* calculate signal from positions */
+				if (parse_path_loss(ctx, cf) != EXIT_SUCCESS)
+					goto fail;
 			}
 		}
-	}
-
-	path_loss = config_lookup(cf, "path_loss");
-
-	if ((!links && !error_probs && !path_loss) ||
-	    ( links && !error_probs && !path_loss) ||
-	    (!links &&  error_probs && !path_loss) ||
-	    (!links && !error_probs &&  path_loss)) {
-	} else {
-		w_flogf(ctx, LOG_ERR, stderr,
-			"specify one of links/error_probs/path_loss\n");
-		goto fail;
 	}
 
 	if (per_file && error_probs) {
@@ -422,17 +429,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	ctx->per_matrix_row_num = 0;
 	if (per_file && read_per_file(ctx, per_file) != EXIT_SUCCESS)
 		goto fail;
-
-	/* create link quality matrix */
-	ctx->snr_matrix = calloc(sizeof(int), count_ids * count_ids);
-	if (!ctx->snr_matrix) {
-		w_flogf(ctx, LOG_ERR, stderr, "Out of memory(snr_matrix)\n");
-		return EXIT_FAILURE;
-	}
-
-	/* set default snrs */
-	for (i = 0; i < count_ids * count_ids; i++)
-		ctx->snr_matrix[i] = SNR_DEFAULT;
 
 	ctx->error_prob_matrix = NULL;
 	if (error_probs) {
@@ -519,11 +515,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 		ctx->error_prob_matrix[ctx->num_stas * end + start] =
 			error_prob_value;
 	}
-
-	/* calculate signal from positions */
-	ctx->move_stations = move_stations_donothing;
-	if (path_loss && parse_path_loss(ctx, cf) != EXIT_SUCCESS)
-		goto fail;
 
 	config_destroy(cf);
 	return EXIT_SUCCESS;
