@@ -293,11 +293,12 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	const config_setting_t *ids, *links, *model_type, *path_loss;
 	const config_setting_t *error_probs = NULL, *error_prob;
 	const config_setting_t *enable_interference;
-	const config_setting_t *fading_coefficient;
+	const config_setting_t *fading_coefficient, *default_prob;
 	int count_ids, i, j;
 	int start, end, snr;
 	struct station *station;
 	const char *model_type_str;
+	float default_prob_value = 0.0;
 
 	/*initialize the config file*/
 	cf = &cfg;
@@ -445,6 +446,18 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 
 		ctx->get_link_snr = get_link_snr_default;
 		ctx->get_error_prob = get_error_prob_from_matrix;
+
+		default_prob = config_lookup(cf, "model.default_prob");
+		if (default_prob) {
+			default_prob_value = config_setting_get_float(
+				default_prob);
+			if (default_prob_value < 0.0 ||
+			    default_prob_value > 1.0) {
+				w_flogf(ctx, LOG_ERR, stderr,
+					"model.default_prob should be in [0.0, 1.0]\n");
+				goto fail;
+			}
+		}
 	}
 
 	/* read snr values */
@@ -454,7 +467,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 		link = config_setting_get_elem(links, i);
 		if (config_setting_length(link) != 3) {
 			w_flogf(ctx, LOG_ERR, stderr, "Invalid link: expected (int,int,int)\n");
-			continue;
+			goto fail;
 		}
 		start = config_setting_get_int_elem(link, 0);
 		end = config_setting_get_int_elem(link, 1);
@@ -464,21 +477,30 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 		    end < 0 || end >= ctx->num_stas) {
 			w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%d]: index out of range\n",
 					start, end, snr);
-			continue;
+			goto fail;
 		}
 		ctx->snr_matrix[ctx->num_stas * start + end] = snr;
 		ctx->snr_matrix[ctx->num_stas * end + start] = snr;
 	}
 
+	/* initialize with default_prob */
+	for (start = 0; error_probs && start < ctx->num_stas; start++)
+		for (end = start + 1; end < ctx->num_stas; end++) {
+			ctx->error_prob_matrix[ctx->num_stas *
+				start + end] =
+			ctx->error_prob_matrix[ctx->num_stas *
+				end + start] = default_prob_value;
+		}
+
 	/* read error probabilities */
-	for (i = 0; error_probs && i < config_setting_length(error_probs);
-	     i++) {
+	for (i = 0; error_probs &&
+	     i < config_setting_length(error_probs); i++) {
 		float error_prob_value;
 
 		error_prob = config_setting_get_elem(error_probs, i);
 		if (config_setting_length(error_prob) != 3) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid link: expected (int,int,float)\n");
-			continue;
+			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability: expected (int,int,float)\n");
+			goto fail;
 		}
 
 		start = config_setting_get_int_elem(error_prob, 0);
@@ -486,10 +508,11 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 		error_prob_value = config_setting_get_float_elem(error_prob, 2);
 
 		if (start < 0 || start >= ctx->num_stas ||
-		    end < 0 || end >= ctx->num_stas) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%f]: index out of range\n",
+		    end < 0 || end >= ctx->num_stas ||
+		    error_prob_value < 0.0 || error_prob_value > 1.0) {
+			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability [%d,%d,%f]\n",
 				start, end, error_prob_value);
-			continue;
+			goto fail;
 		}
 
 		ctx->error_prob_matrix[ctx->num_stas * start + end] =
