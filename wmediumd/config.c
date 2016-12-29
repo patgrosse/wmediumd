@@ -291,7 +291,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 {
 	config_t cfg, *cf;
 	const config_setting_t *ids, *links, *model_type, *path_loss;
-	const config_setting_t *error_probs, *error_prob;
+	const config_setting_t *error_probs = NULL, *error_prob;
 	const config_setting_t *enable_interference;
 	const config_setting_t *fading_coefficient;
 	int count_ids, i, j;
@@ -385,10 +385,12 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 			model_type_str = config_setting_get_string(model_type);
 			if (memcmp("snr", model_type_str, strlen("snr")) == 0) {
 				links = config_lookup(cf, "model.links");
+			} else if (memcmp("prob", model_type_str,
+				strlen("prob")) == 0) {
+				error_probs = config_lookup(cf, "model.links");
 			}
 		}
 	}
-	error_probs = config_lookup(cf, "ifaces.error_probs");
 
 	path_loss = config_lookup(cf, "path_loss");
 
@@ -433,12 +435,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 
 	ctx->error_prob_matrix = NULL;
 	if (error_probs) {
-		if (config_setting_length(error_probs) != count_ids) {
-			w_flogf(ctx, LOG_ERR, stderr,
-				"Specify %d error probabilities\n", count_ids);
-			goto fail;
-		}
-
 		ctx->error_prob_matrix = calloc(sizeof(double),
 						count_ids * count_ids);
 		if (!ctx->error_prob_matrix) {
@@ -475,18 +471,30 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	}
 
 	/* read error probabilities */
-	for (start = 0; error_probs && start < count_ids; start++) {
-		error_prob = config_setting_get_elem(error_probs, start);
-		if (config_setting_length(error_prob) != count_ids) {
-			w_flogf(ctx, LOG_ERR, stderr,
-				"Specify %d error probabilities\n",  count_ids);
-			goto fail;
+	for (i = 0; error_probs && i < config_setting_length(error_probs);
+	     i++) {
+		float error_prob_value;
+
+		error_prob = config_setting_get_elem(error_probs, i);
+		if (config_setting_length(error_prob) != 3) {
+			w_flogf(ctx, LOG_ERR, stderr, "Invalid link: expected (int,int,float)\n");
+			continue;
 		}
-		for (end = start + 1; end < count_ids; end++) {
-			ctx->error_prob_matrix[count_ids * start + end] =
-			ctx->error_prob_matrix[count_ids * end + start] =
-				config_setting_get_float_elem(error_prob, end);
+
+		start = config_setting_get_int_elem(error_prob, 0);
+		end = config_setting_get_int_elem(error_prob, 1);
+		error_prob_value = config_setting_get_float_elem(error_prob, 2);
+
+		if (start < 0 || start >= ctx->num_stas ||
+		    end < 0 || end >= ctx->num_stas) {
+			w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%f]: index out of range\n",
+				start, end, error_prob_value);
+			continue;
 		}
+
+		ctx->error_prob_matrix[ctx->num_stas * start + end] =
+		ctx->error_prob_matrix[ctx->num_stas * end + start] =
+			error_prob_value;
 	}
 
 	/* calculate signal from positions */
