@@ -37,6 +37,7 @@
 #include "wmediumd.h"
 #include "ieee80211.h"
 #include "config.h"
+#include "wserver.h"
 
 static int index_to_rate[] = {
 	60, 90, 120, 180, 240, 360, 480, 540
@@ -836,7 +837,7 @@ static int init_netlink(struct wmediumd *ctx)
 void print_help(int exval)
 {
 	printf("wmediumd v%s - a wireless medium simulator\n", VERSION_STR);
-	printf("wmediumd [-h] [-V] [-l LOG_LVL] [-x FILE] -c FILE \n\n");
+	printf("wmediumd [-h] [-V] [-s] [-l LOG_LVL] [-x FILE] -c FILE\n\n");
 
 	printf("  -h              print this help and exit\n");
 	printf("  -V              print version and exit\n\n");
@@ -849,6 +850,7 @@ void print_help(int exval)
 	printf("                  == 7: all packets will be logged\n");
 	printf("  -c FILE         set input config file\n");
 	printf("  -x FILE         set input PER file\n");
+	printf("  -s              start the server on a socket\n");
 
 	exit(exval);
 }
@@ -881,8 +883,9 @@ int main(int argc, char *argv[])
 	ctx.log_lvl = 6;
 	unsigned long int parse_log_lvl;
 	char* parse_end_token;
+	bool start_server = false;
 
-	while ((opt = getopt(argc, argv, "hVc:l:x:")) != -1) {
+	while ((opt = getopt(argc, argv, "hVc:l:x:s")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help(EXIT_SUCCESS);
@@ -913,6 +916,9 @@ int main(int argc, char *argv[])
 				print_help(EXIT_FAILURE);
 			}
 			ctx.log_lvl = parse_log_lvl;
+			break;
+		case 's':
+			start_server = true;
 			break;
 		case '?':
 			printf("wmediumd: Error - No such option: "
@@ -961,8 +967,14 @@ int main(int argc, char *argv[])
 		w_logf(&ctx, LOG_NOTICE, "REGISTER SENT!\n");
 	}
 
+	if (start_server == true)
+		start_wserver(&ctx);
+
 	/* enter libevent main loop */
 	event_dispatch();
+
+	if (start_server == true)
+		stop_wserver();
 
 	free(ctx.sock);
 	free(ctx.cb);
