@@ -47,7 +47,7 @@ typedef struct {
 const snr_update_request wserver_close_req = (const snr_update_request) {0};
 
 typedef struct {
-    snr_update_request update;
+    snr_update_request request;
     u8 update_result;
 } snr_update_response;
 

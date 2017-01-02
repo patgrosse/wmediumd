@@ -244,7 +244,7 @@ int receive_update_request(const int connectionSoc, snr_update_request *request)
  * @param response A pointer to store the generated response
  */
 void handle_update_request(struct wmediumd *ctx, const snr_update_request *request, snr_update_response *response) {
-    response->update = *request;
+    response->request = *request;
 
     struct station *sender = NULL;
     struct station *receiver = NULL;
