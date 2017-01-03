@@ -29,7 +29,7 @@
 #include <errno.h>
 
 #include "wserver.h"
-#include "wserver_messages.h"
+#include "wmediumd_dynamic.h"
 
 /*
  * Macro for unused parameters
@@ -43,7 +43,7 @@
 /**
  * Global listen socket
  */
-int listenSoc;
+int listen_soc;
 
 /**
  * Global thread
@@ -65,7 +65,7 @@ __sighandler_t old_sig_handler;
 void shutdown_wserver() {
     signal(SIGINT, old_sig_handler);
     printf("\n" LOG_PREFIX "shutting down wserver\n");
-    close(listenSoc);
+    close(listen_soc);
     unlink(WSERVER_SOCKET_PATH);
     wserver_run_bit = true;
 }
@@ -78,62 +78,6 @@ void handle_sigint(int param) {
     UNUSED(param);
     shutdown_wserver();
     exit(EXIT_SUCCESS);
-}
-
-/**
- * Send bytes over a socket, repeat until all bytes are sent
- * @param sock The socket file descriptor
- * @param buf The pointer to the bytes
- * @param len The amount of bytes to send
- * @param flags Flags for the send method
- * @return 0 on success, -1 on error, -2 on client disconnect
- */
-int sendfull(int sock, const void *buf, size_t len, int flags) {
-    size_t total = 0;
-    size_t bytesleft = len;
-    ssize_t currsent = 0;
-    while (total < len) {
-        currsent = send(sock, buf + total, bytesleft, flags);
-        if (currsent == -1) {
-            if (errno == EPIPE || errno == ECONNRESET) {
-                return -2;
-            } else {
-                return -1;
-            }
-        }
-        total += currsent;
-        bytesleft -= currsent;
-    }
-    return 0;
-}
-
-/**
- * Receive bytes from a socket, repeat until all bytes are read
- * @param sock The socket file descriptor
- * @param buf A pointer where to store the received bytes
- * @param len The amount of bytes to receive
- * @param flags Flags for the recv method
- * @return 0 on success, -1 on error, -2 on client disconnect
- */
-int recvfull(int sock, void *buf, size_t len, int flags) {
-    size_t total = 0;
-    size_t bytesleft = len;
-    ssize_t currrecv = 0;
-    while (total < len) {
-        currrecv = recv(sock, buf + total, bytesleft, flags);
-        if (currrecv == -1) {
-            if (errno == EPIPE || errno == ECONNRESET) {
-                return -2;
-            } else {
-                return -1;
-            }
-        } else if (currrecv == 0) {
-            return -2;
-        }
-        total += currrecv;
-        bytesleft -= currrecv;
-    }
-    return 0;
 }
 
 /**
@@ -176,81 +120,29 @@ int create_listen_socket() {
 
 /**
  * Accept incoming connections
- * @param listenSoc The FD of the server socket
+ * @param listen_soc The FD of the server socket
  * @return The FD of the client socket
  */
-int accept_connection(int listenSoc) {
+int accept_connection(int listen_soc) {
     struct sockaddr_in claddr;
     socklen_t claddr_size = sizeof(claddr);
 
-    int soc = accept(listenSoc, (struct sockaddr *) &claddr, &claddr_size);
+    int soc = accept(listen_soc, (struct sockaddr *) &claddr, &claddr_size);
     if (soc < 0) {
-        close(listenSoc);
-        perror(LOG_PREFIX "Accept failed");
         return -1;
     }
-
     return soc;
 }
 
-/**
- * Check if two requests are equal
- * @param first The first request
- * @param second The second request
- * @return true if equal, false otherwise
- */
-bool compare_requests(const snr_update_request *first, const snr_update_request *second) {
-    if (memcmp(first->from_addr, second->from_addr, ETH_ALEN) != 0) {
-        return false;
-    }
-    if (memcmp(first->to_addr, second->to_addr, ETH_ALEN) != 0) {
-        return false;
-    }
-    if (first->snr != second->snr) {
-        return false;
-    }
-    return true;
-}
-
-/**
- * Receive a snr_update_request from a client
- * @param connectionSoc The FD of the connection socket
- * @param request A pointer for the read results
- * @return An integer WACTION constant to determine what to do next
- */
-int receive_update_request(const int connectionSoc, snr_update_request *request) {
-    ssize_t bytes_rcvd = recvfull(connectionSoc, (void *) request, sizeof(snr_update_request), 0);
-    if (bytes_rcvd < 0) {
-        int retval;
-        if (bytes_rcvd == -2) {
-            retval = WACTION_DISCONNECTED;
-        } else {
-            perror(LOG_PREFIX LOG_INDENT LOG_INDENT "Error while receiving");
-            retval = WACTION_ERROR;
-        }
-        close(connectionSoc);
-        return retval;
-    }
-    if (compare_requests(request, &wserver_close_req) == true) {
-        return WACTION_CLOSE;
-    }
-    return WACTION_CONTINUE;
-}
-
-/**
- * Handle a snr_update_request and pass it to wmediumd
- * @param ctx The wmediumd context
- * @param request The received request
- * @param response A pointer to store the generated response
- */
-void handle_update_request(struct wmediumd *ctx, const snr_update_request *request, snr_update_response *response) {
-    response->request = *request;
+int handle_update_request(struct request_ctx *ctx, const snr_update_request *request) {
+    snr_update_response response;
+    response.request = *request;
 
     struct station *sender = NULL;
     struct station *receiver = NULL;
     struct station *station;
 
-    list_for_each_entry(station, &ctx->stations, list) {
+    list_for_each_entry(station, &ctx->ctx->stations, list) {
         if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
             sender = station;
         }
@@ -260,35 +152,143 @@ void handle_update_request(struct wmediumd *ctx, const snr_update_request *reque
     }
 
     if (!sender || !receiver) {
-        response->update_result = WUPDATE_INTF_NOTFOUND;
-        return;
+        printf(LOG_PREFIX LOG_INDENT "Could not perform update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
+               MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr), request->snr);
+        printf(LOG_PREFIX LOG_INDENT "Interface(s) not found\n");
+        response.update_result = WUPDATE_INTF_NOTFOUND;
+    } else {
+        printf(LOG_PREFIX LOG_INDENT "Performing update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
+               MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), request->snr);
+        ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
+        response.update_result = WUPDATE_SUCCESS;
     }
-    printf(LOG_PREFIX LOG_INDENT "Performing update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
-           MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), request->snr);
-    ctx->snr_matrix[sender->index * ctx->num_stas + receiver->index] = request->snr;
-    response->update_result = WUPDATE_SUCCESS;
+    int ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_UPDATE_RESPONSE_TYPE);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
 }
 
-/**
- * Send a response to a client
- * @param connection_soc The FD of the connection socket
- * @param response The response to send
- * @return An integer WACTION constant to determine what to do next
- */
-int send_update_response(int connection_soc, const snr_update_response *response) {
-    ssize_t bytes_sent = sendfull(connection_soc, (const void *) response, sizeof(snr_update_response), MSG_NOSIGNAL);
-    if (bytes_sent < 0) {
-        int retval;
-        if (bytes_sent == -2) {
-            retval = WACTION_DISCONNECTED;
+int handle_delete_by_id_request(struct request_ctx *ctx, station_del_by_id_request *request) {
+    station_del_by_id_response response;
+    response.request = *request;
+    int ret = del_station_by_id(ctx->ctx, request->id);
+    if (ret) {
+        if (ret == -ENODEV) {
+            response.update_result = WUPDATE_INTF_NOTFOUND;
         } else {
-            perror(LOG_PREFIX LOG_INDENT LOG_INDENT "Error while sending");
-            retval = WACTION_ERROR;
+            w_logf(ctx->ctx, LOG_ERR, "Error on delete by id request: %s", strerror(abs(ret)));
+            return WACTION_ERROR;
         }
-        close(connection_soc);
-        return retval;
+    } else {
+        response.update_result = WUPDATE_SUCCESS;
     }
-    return WACTION_CONTINUE;
+    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_ID_RESPONSE_TYPE);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on delete by id response: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
+}
+
+int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_request *request) {
+    station_del_by_mac_response response;
+    response.request = *request;
+    int ret = del_station_by_mac(ctx->ctx, request->addr);
+    if (ret) {
+        if (ret == -ENODEV) {
+            response.update_result = WUPDATE_INTF_NOTFOUND;
+        } else {
+            w_logf(ctx->ctx, LOG_ERR, "Error %d on delete by mac request: %s", ret, strerror(abs(ret)));
+            return WACTION_ERROR;
+        }
+    } else {
+        response.update_result = WUPDATE_SUCCESS;
+    }
+    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on delete by mac response: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
+}
+
+int handle_add_request(struct request_ctx *ctx, station_add_request *request) {
+    int ret = add_station(ctx->ctx, request->addr);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on add request: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
+            "Added station with MAC " MAC_FMT " and ID %d\n", MAC_ARGS(request->addr), ret);
+    station_add_response response = {
+            .request = *request,
+            .update_result = WUPDATE_SUCCESS
+    };
+    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_ADD_RESPONSE_TYPE);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on add response: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
+}
+
+int parse_recv_msg_rest_error(struct wmediumd *ctx, int value) {
+    if (value > 0) {
+        return value;
+    } else {
+        w_logf(ctx, LOG_ERR, "Error on receive msg rest: %s", strerror(abs(value)));
+        return WACTION_ERROR;
+    }
+}
+
+int receive_handle_request(struct request_ctx *ctx) {
+    wserver_msg base;
+    int ret = wserver_recv_msg_base(ctx->sock_fd, &base);
+    if (ret > 0) {
+        return ret;
+    } else if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on receive base request: %s", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    if (base.type == WSERVER_SHUTDOWN_REQUEST_TYPE) {
+        return WACTION_CLOSE;
+    } else if (base.type == WSERVER_UPDATE_REQUEST_TYPE) {
+        snr_update_request request;
+        request.base = base;
+        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_UPDATE_REQUEST_TYPE))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_update_request(ctx, &request);
+        }
+    } else if (base.type == WSERVER_DEL_BY_MAC_REQUEST_TYPE) {
+        station_del_by_mac_request request;
+        request.base = base;
+        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_DEL_BY_MAC_REQUEST_TYPE))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_delete_by_mac_request(ctx, &request);
+        }
+    } else if (base.type == WSERVER_DEL_BY_ID_REQUEST_TYPE) {
+        station_del_by_id_request request;
+        request.base = base;
+        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_DEL_BY_ID_REQUEST_TYPE))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_delete_by_id_request(ctx, &request);
+        }
+    } else if (base.type == WSERVER_ADD_REQUEST_TYPE) {
+        station_add_request request;
+        request.base = base;
+        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_ADD_REQUEST_TYPE))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_add_request(ctx, &request);
+        }
+    } else {
+        return -1;
+    }
 }
 
 /**
@@ -299,56 +299,37 @@ int send_update_response(int connection_soc, const snr_update_response *response
 void *run_wserver(void *ctx) {
     old_sig_handler = signal(SIGINT, handle_sigint);
 
-    listenSoc = create_listen_socket();
-    if (listenSoc < 0) {
+    listen_soc = create_listen_socket();
+    if (listen_soc < 0) {
         return NULL;
     }
     while (wserver_run_bit) {
         printf(LOG_PREFIX "Waiting for client to connect...\n");
-        int connectSoc = accept_connection(listenSoc);
-        printf(LOG_PREFIX LOG_INDENT "Client connected\n");
-        while (1) {
-            snr_update_request request;
-            snr_update_response response;
-            int action_resp;
-
-            printf(LOG_PREFIX "Waiting for request...\n");
-            action_resp = receive_update_request(connectSoc, &request);
-            if (action_resp == WACTION_DISCONNECTED) {
-                printf(LOG_PREFIX LOG_INDENT "Client has disconnected\n");
-                break;
-            }
-            if (action_resp == WACTION_ERROR) {
-                printf(LOG_PREFIX LOG_INDENT "Disconnecting client because of error\n");
-                break;
-            }
-            printf(LOG_PREFIX LOG_INDENT "Received: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
-                   MAC_ARGS(request.from_addr), MAC_ARGS(request.to_addr), request.snr);
-            if (action_resp == WACTION_CLOSE) {
-                printf(LOG_PREFIX LOG_INDENT "Closing server\n");
-                wserver_run_bit = false;
-                break;
-            }
-
-            handle_update_request(ctx, &request, &response);
-
-            printf(LOG_PREFIX "Answering with state %d...\n", response.update_result);
-            action_resp = send_update_response(connectSoc, &response);
-            if (action_resp == WACTION_DISCONNECTED) {
-                printf(LOG_PREFIX LOG_INDENT "Client has disconnected\n");
-                break;
-            }
-            printf(LOG_PREFIX LOG_INDENT "Answer sent.\n");
-            if (action_resp == WACTION_ERROR) {
-                printf(LOG_PREFIX LOG_INDENT "Disconnecting client because of error\n");
-                break;
-            } else if (action_resp == WACTION_CLOSE) {
-                printf(LOG_PREFIX LOG_INDENT "Closing server\n");
-                wserver_run_bit = false;
-                break;
+        struct request_ctx rctx;
+        rctx.ctx = ctx;
+        rctx.sock_fd = accept_connection(listen_soc);
+        if (rctx.sock_fd < 0) {
+            perror(LOG_PREFIX "Accept failed");
+        } else {
+            printf(LOG_PREFIX "Client connected\n");
+            while (1) {
+                int action_resp;
+                printf(LOG_PREFIX LOG_INDENT "Waiting for request...\n");
+                action_resp = receive_handle_request(&rctx);
+                if (action_resp == WACTION_DISCONNECTED) {
+                    printf(LOG_PREFIX LOG_INDENT "Client has disconnected\n");
+                    break;
+                } else if (action_resp == WACTION_ERROR) {
+                    printf(LOG_PREFIX LOG_INDENT "Disconnecting client because of error\n");
+                    break;
+                } else if (action_resp == WACTION_CLOSE) {
+                    printf(LOG_PREFIX LOG_INDENT "Closing server\n");
+                    wserver_run_bit = false;
+                    break;
+                }
             }
         }
-        close(connectSoc);
+        close(rctx.sock_fd);
     }
     shutdown_wserver();
     return NULL;

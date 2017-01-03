@@ -20,30 +20,43 @@
 
 #include "../wmediumd/wserver_messages.h"
 #include <unistd.h>
+#include <stdlib.h>
 #include <sys/un.h>
 #include <stdio.h>
 #include <sys/socket.h>
-#include <stdlib.h>
 
 
-void send_update_request(int connectionSoc, const snr_update_request *request) {
-    ssize_t bytes_sent = send(connectionSoc, (const void *) request, sizeof(snr_update_request), 0);
-    if (bytes_sent < 0) {
-        close(connectionSoc);
+void send_update_request(int connection_soc, snr_update_request *request) {
+    int ret = wserver_send_msg(connection_soc, request, WSERVER_UPDATE_REQUEST_TYPE);
+    if (ret < 0) {
         perror("error while sending");
+        close(connection_soc);
         exit(EXIT_FAILURE);
     }
-    printf("send %d bytes\n", (int) bytes_sent);
+    printf("sent\n");
 }
 
-void receive_update_response(const int connectionSoc, snr_update_response *response) {
-    ssize_t bytes_rcvd = recv(connectionSoc, (void *) response, sizeof(snr_update_response), 0);
-    if (bytes_rcvd < 0) {
-        close(connectionSoc);
+void receive_update_response(const int connection_soc, snr_update_response *response) {
+    wserver_msg base;
+    int ret = wserver_recv_msg_base(connection_soc, &base);
+    if (ret < 0) {
         perror("error while receiving");
-        return;
+        close(connection_soc);
+        exit(EXIT_FAILURE);
     }
-    printf("received %d bytes\n", (int) bytes_rcvd);
+    if (base.type != WSERVER_UPDATE_RESPONSE_TYPE) {
+        fprintf(stderr, "Received invalid request of type %d", base.type);
+        close(connection_soc);
+        exit(EXIT_FAILURE);
+    }
+    response->base = base;
+    ret = wserver_recv_msg_rest(connection_soc, response, base.type);
+    if (ret < 0) {
+        perror("error while receiving");
+        close(connection_soc);
+        exit(EXIT_FAILURE);
+    }
+    printf("received\n");
 }
 
 void string_to_mac_address(const char *str, u8 *addr) {
@@ -80,7 +93,6 @@ int main() {
         string_to_mac_address("02:00:00:00:01:00", request.to_addr);
         request.snr = 0;
         send_update_request(create_socket, &request);
-        printf("sent\n");
         snr_update_response response;
         receive_update_response(create_socket, &response);
         printf("answer was: %d\n", response.update_result);

@@ -1,7 +1,7 @@
 CFLAGS = -g -Wall -O2
 LDFLAGS =
 
-OBJECTS=client.o
+OBJECTS=client.o ../wmediumd/wserver_messages.o
 
 all: client
 

@@ -22,6 +22,12 @@
 #define WMEDIUMD_SERVER_H
 
 #include "wmediumd.h"
+#include "wserver_messages.h"
+
+struct request_ctx {
+    struct wmediumd *ctx;
+    int sock_fd;
+};
 
 /**
  * Start the server using the given wmediumd context in a background task
@@ -35,5 +41,18 @@ int start_wserver(struct wmediumd *ctx);
  * @return 0 on success
  */
 int stop_wserver();
+
+/**
+ * Handle a snr_update_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
+int handle_update_request(struct request_ctx *ctx, const snr_update_request *request);
+
+int handle_delete_by_id_request(struct request_ctx *ctx, station_del_by_id_request *request);
+
+int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_request *request);
+
+int handle_add_request(struct request_ctx *ctx, station_add_request *request);
 
 #endif //WMEDIUMD_SERVER_H
