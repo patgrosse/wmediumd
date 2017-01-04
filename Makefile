@@ -1,6 +1,6 @@
 SHELL=/bin/sh
 MAKE = make
-SUBDIRS ?= wmediumd examples
+SUBDIRS ?= wmediumd tests
 BIN = wmediumd/wmediumd
 BINDIR = /usr/bin
 
