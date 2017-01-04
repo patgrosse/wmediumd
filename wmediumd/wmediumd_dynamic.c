@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include "wmediumd_dynamic.h"
 
+pthread_mutex_t snr_lock = PTHREAD_MUTEX_INITIALIZER;
+
 int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **backup) {
     if (backup) {
         *backup = malloc(sizeof(int) * oldsize * oldsize);
@@ -40,6 +42,7 @@ int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **
 }
 
 int add_station(struct wmediumd *ctx, const u8 addr[]) {
+    pthread_mutex_lock(&snr_lock);
     int oldnum = ctx->num_stas;
     int newnum = oldnum + 1;
 
@@ -47,7 +50,7 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     int *oldmatrix;
     int ret;
     if ((ret = switch_matrix(&ctx->snr_matrix, oldnum, newnum, &oldmatrix))) {
-        return ret;
+        goto out;
     }
 
     // Copy old matrix
@@ -69,7 +72,8 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     struct station *station;
     station = malloc(sizeof(*station));
     if (!station) {
-        return -ENOMEM;
+        ret = -ENOMEM;
+        goto out;
     }
     station->index = oldnum;
     memcpy(station->addr, addr, ETH_ALEN);
@@ -77,8 +81,11 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     station_init_queues(station);
     list_add_tail(&station->list, &ctx->stations);
     ctx->num_stas = newnum;
+    ret = station->index;
 
-    return station->index;
+    out:
+    pthread_mutex_unlock(&snr_lock);
+    return ret;
 }
 
 int del_station(struct wmediumd *ctx, struct station *station) {
@@ -123,21 +130,35 @@ int del_station(struct wmediumd *ctx, struct station *station) {
 }
 
 int del_station_by_id(struct wmediumd *ctx, const int id) {
+    pthread_mutex_lock(&snr_lock);
+    int ret;
     struct station *station;
     list_for_each_entry(station, &ctx->stations, list) {
         if (station->index == id) {
-            return del_station(ctx, station);
+            ret = del_station(ctx, station);
+            goto out;
         }
     }
-    return -ENODEV;
+
+    out:
+    ret = -ENODEV;
+    pthread_mutex_unlock(&snr_lock);
+    return ret;
 }
 
 int del_station_by_mac(struct wmediumd *ctx, const u8 *addr) {
+    pthread_mutex_lock(&snr_lock);
+    int ret;
     struct station *station;
     list_for_each_entry(station, &ctx->stations, list) {
         if (memcmp(addr, station->addr, ETH_ALEN) == 0) {
-            return del_station(ctx, station);
+            ret = del_station(ctx, station);
+            goto out;
         }
     }
-    return -ENODEV;
+
+    out:
+    ret = -ENODEV;
+    pthread_mutex_unlock(&snr_lock);
+    return ret;
 }

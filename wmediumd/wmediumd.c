@@ -33,11 +33,13 @@
 #include <sys/timerfd.h>
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 
 #include "wmediumd.h"
 #include "ieee80211.h"
 #include "config.h"
 #include "wserver.h"
+#include "wmediumd_dynamic.h"
 
 static int index_to_rate[] = {
 	60, 90, 120, 180, 240, 360, 480, 540
@@ -698,6 +700,7 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 	u8 *src;
 
 	if (gnlh->cmd == HWSIM_CMD_FRAME) {
+		pthread_mutex_lock(&snr_lock);
 		/* we get the attributes*/
 		genlmsg_parse(nlh, 0, attrs, HWSIM_ATTR_MAX, NULL);
 		if (attrs[HWSIM_ATTR_ADDR_TRANSMITTER]) {
@@ -743,8 +746,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			       min(tx_rates_len, sizeof(frame->tx_rates)));
 			queue_frame(ctx, sender, frame);
 		}
-	}
 out:
+		pthread_mutex_unlock(&snr_lock);
+	}
 	return 0;
 }
 
@@ -859,9 +863,11 @@ static void timer_cb(int fd, short what, void *data)
 {
 	struct wmediumd *ctx = data;
 
+	pthread_mutex_lock(&snr_lock);
 	ctx->move_stations(ctx);
 	deliver_expired_frames(ctx);
 	rearm_timer(ctx);
+	pthread_mutex_unlock(&snr_lock);
 }
 
 int main(int argc, char *argv[])

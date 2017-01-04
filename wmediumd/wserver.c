@@ -142,6 +142,8 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
     struct station *receiver = NULL;
     struct station *station;
 
+    pthread_mutex_lock(&snr_lock);
+
     list_for_each_entry(station, &ctx->ctx->stations, list) {
         if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
             sender = station;
@@ -162,6 +164,7 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
         ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
         response.update_result = WUPDATE_SUCCESS;
     }
+    pthread_mutex_unlock(&snr_lock);
     int ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_UPDATE_RESPONSE_TYPE);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s", strerror(abs(ret)));

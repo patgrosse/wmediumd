@@ -22,6 +22,7 @@
 #define WMEDIUMD_WMEDIUMD_DYNAMIC_H
 
 #include <stdint.h>
+#include <pthread.h>
 #include "wmediumd.h"
 
 typedef uint8_t u8;
@@ -57,5 +58,10 @@ int del_station_by_id(struct wmediumd *ctx, const int id);
  * @return 0 on success otherwise a negative errno value
  */
 int del_station_by_mac(struct wmediumd *ctx, const u8 *addr);
+
+/**
+ * Lock for the snr matrix/station list
+ */
+extern pthread_mutex_t snr_lock;
 
 #endif //WMEDIUMD_WMEDIUMD_DYNAMIC_H
