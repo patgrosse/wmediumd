@@ -104,6 +104,12 @@ int del_station(struct wmediumd *ctx, struct station *station) {
 
     int index = station->index;
 
+    // Decreasing index of stations following deleted station
+    struct station *sta_loop = station;
+    list_for_each_entry_from(sta_loop, &ctx->stations, list) {
+        sta_loop->index = sta_loop->index - 1;
+    }
+
     // Copy all values not related to deleted station
     int xnew = 0;
     for (int x = 0; x < oldnum; x++) {
