@@ -117,6 +117,15 @@ int main() {
         receive_response(create_socket, &response3, WSERVER_UPDATE_RESPONSE_TYPE);
         printf("answer was: %d\n", response3.update_result);
 
+
+        printf("==== station del\n");
+        station_del_by_mac_request request4;
+        string_to_mac_address("02:00:00:00:02:00", request4.addr);
+        send_request(create_socket, &request4, WSERVER_DEL_BY_MAC_REQUEST_TYPE);
+        station_del_by_mac_response response4;
+        receive_response(create_socket, &response4, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
+        printf("answer was: %d\n", response4.update_result);
+
         close(create_socket);
         printf("socket closed\n");
     } else {
