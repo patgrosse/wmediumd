@@ -32,6 +32,7 @@
 
 #define WUPDATE_SUCCESS 0 /* update of SNR successful */
 #define WUPDATE_INTF_NOTFOUND 1 /* unknown interface */
+#define WUPDATE_INTF_DUPLICATE 2 /* interface already exists */
 
 /* Socket location following FHS guidelines:
  * http://www.pathname.com/fhs/pub/fhs-2.3.html#PURPOSE46 */

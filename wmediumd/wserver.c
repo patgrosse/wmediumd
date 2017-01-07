@@ -38,7 +38,6 @@
 
 
 #define LOG_PREFIX "W_SRV: "
-#define LOG_INDENT "    "
 
 /**
  * Global listen socket
@@ -82,38 +81,40 @@ void handle_sigint(int param) {
 
 /**
  * Create the listening socket
+ * @param ctx The wmediumd context
  * @return The FD of the socket
  */
-int create_listen_socket() {
+int create_listen_socket(struct wmediumd *ctx) {
     int soc = socket(AF_UNIX, SOCK_STREAM, 0);
     if (soc < 0) {
-        perror(LOG_PREFIX "Socket not created");
+        w_logf(ctx, LOG_ERR, LOG_PREFIX "Socket not created: %s\n", strerror(errno));
         return -1;
     }
-    printf(LOG_PREFIX "Socket created\n");
+    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Socket created\n");
 
     int unlnk_ret = unlink(WSERVER_SOCKET_PATH);
     if (unlnk_ret != 0 && errno != ENOENT) {
-        perror(LOG_PREFIX "Cannot remove old UNIX socket at '" WSERVER_SOCKET_PATH "'");
+        w_logf(ctx, LOG_ERR, LOG_PREFIX "Cannot remove old UNIX socket at '\" WSERVER_SOCKET_PATH \"': %s\n",
+               strerror(errno));
         close(soc);
         return -1;
     }
     struct sockaddr_un saddr = {AF_UNIX, WSERVER_SOCKET_PATH};
     int retval = bind(soc, (struct sockaddr *) &saddr, sizeof(saddr));
     if (retval < 0) {
-        perror(LOG_PREFIX "Bind failed");
+        w_logf(ctx, LOG_ERR, LOG_PREFIX "Bind failed: %s\n", strerror(errno));
         close(soc);
         return -1;
     }
-    printf(LOG_PREFIX "Bound to UNIX socket '" WSERVER_SOCKET_PATH "'\n");
+    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Bound to UNIX socket '" WSERVER_SOCKET_PATH "'\n");
 
     retval = listen(soc, 1);
     if (retval < 0) {
-        perror(LOG_PREFIX "Listen failed");
+        w_logf(ctx, LOG_ERR, LOG_PREFIX "Listen failed: %s\n", strerror(errno));
         close(soc);
         return -1;
     }
-    printf(LOG_PREFIX "Listening for incoming connection\n");
+    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Listening for incoming connection\n");
 
     return soc;
 }
@@ -154,12 +155,12 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
     }
 
     if (!sender || !receiver) {
-        printf(LOG_PREFIX LOG_INDENT "Could not perform update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
+        w_logf(ctx->ctx, LOG_WARNING,
+               LOG_PREFIX "Could not perform update from=" MAC_FMT ", to=" MAC_FMT ", snr=%d; station(s) not found\n",
                MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr), request->snr);
-        printf(LOG_PREFIX LOG_INDENT "Interface(s) not found\n");
         response.update_result = WUPDATE_INTF_NOTFOUND;
     } else {
-        printf(LOG_PREFIX LOG_INDENT "Performing update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
                MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), request->snr);
         ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
         response.update_result = WUPDATE_SUCCESS;
@@ -167,7 +168,7 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
     pthread_mutex_unlock(&snr_lock);
     int ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_UPDATE_RESPONSE_TYPE);
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -179,17 +180,21 @@ int handle_delete_by_id_request(struct request_ctx *ctx, station_del_by_id_reque
     int ret = del_station_by_id(ctx->ctx, request->id);
     if (ret) {
         if (ret == -ENODEV) {
+            w_logf(ctx->ctx, LOG_WARNING, LOG_PREFIX
+                    "Station with ID %d could not be found\n", request->id);
             response.update_result = WUPDATE_INTF_NOTFOUND;
         } else {
-            w_logf(ctx->ctx, LOG_ERR, "Error on delete by id request: %s", strerror(abs(ret)));
+            w_logf(ctx->ctx, LOG_ERR, "Error on delete by id request: %s\n", strerror(abs(ret)));
             return WACTION_ERROR;
         }
     } else {
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
+                "Station with ID %d successfully deleted\n", request->id);
         response.update_result = WUPDATE_SUCCESS;
     }
     ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_ID_RESPONSE_TYPE);
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on delete by id response: %s", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on delete by id response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -201,17 +206,21 @@ int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_req
     int ret = del_station_by_mac(ctx->ctx, request->addr);
     if (ret) {
         if (ret == -ENODEV) {
+            w_logf(ctx->ctx, LOG_WARNING, LOG_PREFIX
+                    "Station with MAC " MAC_FMT " could not be found\n", MAC_ARGS(request->addr));
             response.update_result = WUPDATE_INTF_NOTFOUND;
         } else {
-            w_logf(ctx->ctx, LOG_ERR, "Error %d on delete by mac request: %s", ret, strerror(abs(ret)));
+            w_logf(ctx->ctx, LOG_ERR, "Error %d on delete by mac request: %s\n", ret, strerror(abs(ret)));
             return WACTION_ERROR;
         }
     } else {
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
+                "Station with MAC " MAC_FMT " successfully deleted\n", MAC_ARGS(request->addr));
         response.update_result = WUPDATE_SUCCESS;
     }
     ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on delete by mac response: %s", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on delete by mac response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -219,20 +228,27 @@ int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_req
 
 int handle_add_request(struct request_ctx *ctx, station_add_request *request) {
     int ret = add_station(ctx->ctx, request->addr);
+    station_add_response response;
+    response.request = *request;
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on add request: %s", strerror(abs(ret)));
-        return WACTION_ERROR;
+        if (ret == -EEXIST) {
+            w_logf(ctx->ctx, LOG_WARNING, LOG_PREFIX
+                    "Station with MAC " MAC_FMT " already exists\n", MAC_ARGS(request->addr));
+            response.created_id = 0;
+            response.update_result = WUPDATE_INTF_DUPLICATE;
+        } else {
+            w_logf(ctx->ctx, LOG_ERR, "Error on add request: %s\n", strerror(abs(ret)));
+            return WACTION_ERROR;
+        }
+    } else {
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
+                "Added station with MAC " MAC_FMT " and ID %d\n", MAC_ARGS(request->addr), ret);
+        response.created_id = (u8) ret;
+        response.update_result = WUPDATE_SUCCESS;
     }
-    w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
-            "Added station with MAC " MAC_FMT " and ID %d\n", MAC_ARGS(request->addr), ret);
-    station_add_response response = {
-            .request = *request,
-            .created_id = (u8) ret,
-            .update_result = WUPDATE_SUCCESS
-    };
     ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_ADD_RESPONSE_TYPE);
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on add response: %s", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on add response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -242,7 +258,7 @@ int parse_recv_msg_rest_error(struct wmediumd *ctx, int value) {
     if (value > 0) {
         return value;
     } else {
-        w_logf(ctx, LOG_ERR, "Error on receive msg rest: %s", strerror(abs(value)));
+        w_logf(ctx, LOG_ERR, "Error on receive msg rest: %s\n", strerror(abs(value)));
         return WACTION_ERROR;
     }
 }
@@ -253,7 +269,7 @@ int receive_handle_request(struct request_ctx *ctx) {
     if (ret > 0) {
         return ret;
     } else if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on receive base request: %s", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on receive base request: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     if (base.type == WSERVER_SHUTDOWN_REQUEST_TYPE) {
@@ -303,31 +319,31 @@ int receive_handle_request(struct request_ctx *ctx) {
 void *run_wserver(void *ctx) {
     old_sig_handler = signal(SIGINT, handle_sigint);
 
-    listen_soc = create_listen_socket();
+    listen_soc = create_listen_socket(ctx);
     if (listen_soc < 0) {
         return NULL;
     }
     while (wserver_run_bit) {
-        printf(LOG_PREFIX "Waiting for client to connect...\n");
+        w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Waiting for client to connect...\n");
         struct request_ctx rctx;
         rctx.ctx = ctx;
         rctx.sock_fd = accept_connection(listen_soc);
         if (rctx.sock_fd < 0) {
-            perror(LOG_PREFIX "Accept failed");
+            w_logf(ctx, LOG_ERR, LOG_PREFIX "Accept failed: %s\n", strerror(errno));
         } else {
-            printf(LOG_PREFIX "Client connected\n");
+            w_logf(ctx, LOG_INFO, LOG_PREFIX "Client connected\n");
             while (1) {
                 int action_resp;
-                printf(LOG_PREFIX LOG_INDENT "Waiting for request...\n");
+                w_logf(ctx, LOG_INFO, LOG_PREFIX "Waiting for request...\n");
                 action_resp = receive_handle_request(&rctx);
                 if (action_resp == WACTION_DISCONNECTED) {
-                    printf(LOG_PREFIX LOG_INDENT "Client has disconnected\n");
+                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Client has disconnected\n");
                     break;
                 } else if (action_resp == WACTION_ERROR) {
-                    printf(LOG_PREFIX LOG_INDENT "Disconnecting client because of error\n");
+                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Disconnecting client because of error\n");
                     break;
                 } else if (action_resp == WACTION_CLOSE) {
-                    printf(LOG_PREFIX LOG_INDENT "Closing server\n");
+                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Closing server\n");
                     wserver_run_bit = false;
                     break;
                 }

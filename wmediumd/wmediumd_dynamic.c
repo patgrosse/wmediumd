@@ -42,6 +42,12 @@ int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **
 }
 
 int add_station(struct wmediumd *ctx, const u8 addr[]) {
+    struct station *sta_loop;
+    list_for_each_entry(sta_loop, &ctx->stations, list) {
+        if (memcmp(sta_loop->addr, addr, ETH_ALEN) == 0)
+            return -EEXIST;
+    }
+
     pthread_mutex_lock(&snr_lock);
     int oldnum = ctx->num_stas;
     int newnum = oldnum + 1;
@@ -162,9 +168,9 @@ int del_station_by_mac(struct wmediumd *ctx, const u8 *addr) {
             goto out;
         }
     }
-
-    out:
     ret = -ENODEV;
+    
+    out:
     pthread_mutex_unlock(&snr_lock);
     return ret;
 }
