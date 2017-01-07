@@ -227,6 +227,7 @@ int handle_add_request(struct request_ctx *ctx, station_add_request *request) {
             "Added station with MAC " MAC_FMT " and ID %d\n", MAC_ARGS(request->addr), ret);
     station_add_response response = {
             .request = *request,
+            .created_id = (u8) ret,
             .update_result = WUPDATE_SUCCESS
     };
     ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_ADD_RESPONSE_TYPE);

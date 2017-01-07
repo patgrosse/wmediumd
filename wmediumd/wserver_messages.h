@@ -96,6 +96,7 @@ typedef struct {
 typedef struct {
     wserver_msg base;
     station_add_request request;
+    u8 created_id;
     u8 update_result;
 } station_add_response;
 
