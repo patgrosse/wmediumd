@@ -62,16 +62,16 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     // Copy old matrix
     for (int x = 0; x < oldnum; x++) {
         for (int y = 0; y < oldnum; y++) {
-            ctx->snr_matrix[x * oldnum + y] = oldmatrix[x * oldnum + y];
+            ctx->snr_matrix[x * newnum + y] = oldmatrix[x * oldnum + y];
         }
     }
 
     // Fill last lines with null
     for (int x = 0; x < newnum; x++) {
-        ctx->snr_matrix[x * newnum + newnum] = 0;
+        ctx->snr_matrix[x * newnum + oldnum] = 0;
     }
     for (int y = 0; y < newnum; y++) {
-        ctx->snr_matrix[newnum + y] = 0;
+        ctx->snr_matrix[oldnum * newnum + y] = 0;
     }
 
     // Init new station object
