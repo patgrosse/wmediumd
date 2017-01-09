@@ -122,7 +122,7 @@ static int timespec_sub(struct timespec *a, struct timespec *b,
 void rearm_timer(struct wmediumd *ctx)
 {
 	struct timespec min_expires;
-	struct itimerspec expires = {};
+	struct itimerspec expires;
 	struct station *station;
 	struct frame *frame;
 	int i;
@@ -148,6 +148,7 @@ void rearm_timer(struct wmediumd *ctx)
 	}
 
 	if (set_min_expires) {
+		memset(&expires, 0, sizeof(expires));
 		expires.it_value = min_expires;
 		timerfd_settime(ctx->timerfd, TFD_TIMER_ABSTIME, &expires,
 				NULL);
