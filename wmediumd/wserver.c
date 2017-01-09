@@ -27,6 +27,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
+#include <event.h>
+#include <event2/thread.h>
 
 #include "wserver.h"
 #include "wmediumd_dynamic.h"
@@ -42,21 +44,22 @@
 /**
  * Global listen socket
  */
-int listen_soc;
+static int listen_soc;
 
 /**
  * Global thread
  */
-pthread_t server_thread;
+static pthread_t server_thread;
+
 /**
- * When set to false, the server is shut down
+ * Event base for server events
  */
-bool wserver_run_bit = true;
+static struct event_base *server_event_base;
 
 /**
  * Stores the old sig handler for SIGINT
  */
-__sighandler_t old_sig_handler;
+static __sighandler_t old_sig_handler;
 
 /**
  * Shutdown the server
@@ -66,7 +69,6 @@ void shutdown_wserver() {
     printf("\n" LOG_PREFIX "shutting down wserver\n");
     close(listen_soc);
     unlink(WSERVER_SOCKET_PATH);
-    wserver_run_bit = true;
 }
 
 /**
@@ -108,13 +110,12 @@ int create_listen_socket(struct wmediumd *ctx) {
     }
     w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Bound to UNIX socket '" WSERVER_SOCKET_PATH "'\n");
 
-    retval = listen(soc, 1);
+    retval = listen(soc, 10);
     if (retval < 0) {
         w_logf(ctx, LOG_ERR, LOG_PREFIX "Listen failed: %s\n", strerror(errno));
         close(soc);
         return -1;
     }
-    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Listening for incoming connection\n");
 
     return soc;
 }
@@ -311,46 +312,82 @@ int receive_handle_request(struct request_ctx *ctx) {
     }
 }
 
+struct accept_context {
+    struct wmediumd *wctx;
+    int server_socket;
+    int client_socket;
+    pthread_t *thread;
+};
+
+void *handle_accepted_connection(void *d_ptr) {
+    struct accept_context *actx = d_ptr;
+    struct request_ctx rctx;
+    rctx.ctx = actx->wctx;
+    rctx.sock_fd = actx->client_socket;
+    w_logf(rctx.ctx, LOG_INFO, LOG_PREFIX "Client connected\n");
+    while (1) {
+        int action_resp;
+        w_logf(rctx.ctx, LOG_INFO, LOG_PREFIX "Waiting for request...\n");
+        action_resp = receive_handle_request(&rctx);
+        if (action_resp == WACTION_DISCONNECTED) {
+            w_logf(rctx.ctx, LOG_INFO, LOG_PREFIX "Client has disconnected\n");
+            break;
+        } else if (action_resp == WACTION_ERROR) {
+            w_logf(rctx.ctx, LOG_INFO, LOG_PREFIX "Disconnecting client because of error\n");
+            break;
+        } else if (action_resp == WACTION_CLOSE) {
+            w_logf(rctx.ctx, LOG_INFO, LOG_PREFIX "Closing server\n");
+            event_base_loopbreak(server_event_base);
+            break;
+        }
+    }
+    close(rctx.sock_fd);
+    free(actx);
+    return NULL;
+}
+
+void on_listen_event(int fd, short what, void *wctx) {
+    UNUSED(fd);
+    UNUSED(what);
+    struct accept_context *actx = malloc(sizeof(struct accept_context));
+    actx->wctx = wctx;
+    actx->server_socket = fd;
+    actx->thread = malloc(sizeof(pthread_t));
+    actx->client_socket = accept_connection(actx->server_socket);
+    if (actx->client_socket < 0) {
+        w_logf(actx->wctx, LOG_ERR, LOG_PREFIX "Accept failed: %s\n", strerror(errno));
+    } else {
+        pthread_create(actx->thread, NULL, handle_accepted_connection, actx);
+    }
+}
+
 /**
  * Run the server using the given wmediumd context
  * @param ctx The wmediumd context
  * @return NULL, required for pthread
  */
 void *run_wserver(void *ctx) {
+    struct event *accept_event;
+
     old_sig_handler = signal(SIGINT, handle_sigint);
 
     listen_soc = create_listen_socket(ctx);
     if (listen_soc < 0) {
         return NULL;
     }
-    while (wserver_run_bit) {
-        w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Waiting for client to connect...\n");
-        struct request_ctx rctx;
-        rctx.ctx = ctx;
-        rctx.sock_fd = accept_connection(listen_soc);
-        if (rctx.sock_fd < 0) {
-            w_logf(ctx, LOG_ERR, LOG_PREFIX "Accept failed: %s\n", strerror(errno));
-        } else {
-            w_logf(ctx, LOG_INFO, LOG_PREFIX "Client connected\n");
-            while (1) {
-                int action_resp;
-                w_logf(ctx, LOG_INFO, LOG_PREFIX "Waiting for request...\n");
-                action_resp = receive_handle_request(&rctx);
-                if (action_resp == WACTION_DISCONNECTED) {
-                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Client has disconnected\n");
-                    break;
-                } else if (action_resp == WACTION_ERROR) {
-                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Disconnecting client because of error\n");
-                    break;
-                } else if (action_resp == WACTION_CLOSE) {
-                    w_logf(ctx, LOG_INFO, LOG_PREFIX "Closing server\n");
-                    wserver_run_bit = false;
-                    break;
-                }
-            }
-        }
-        close(rctx.sock_fd);
-    }
+    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Listening for incoming connection\n");
+
+    evthread_use_pthreads();
+    evutil_make_socket_nonblocking(listen_soc);
+    server_event_base = event_base_new();
+    accept_event = event_new(server_event_base, listen_soc, EV_READ | EV_PERSIST, on_listen_event, ctx);
+    event_add(accept_event, NULL);
+
+    w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Waiting for client to connect...\n");
+    event_base_dispatch(server_event_base);
+
+    event_free(accept_event);
+    event_base_free(server_event_base);
     shutdown_wserver();
     return NULL;
 }
