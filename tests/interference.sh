@@ -1,8 +1,10 @@
 #!/bin/bash
-# 4 mesh nodes in a diamond topology
-# paths must go through one of two intermediate nodes.
+# 3 mesh nodes in a linear topology
+# 4 additional mesh nodes exists to prevent transmission
+# When enable_interference=true, ping always fails.
+# (This test is not perfect because of random values)
 
-num_nodes=4
+num_nodes=7
 session=wmediumd
 subnet=10.10.10
 macfmt='02:00:00:00:%02x:00'
@@ -28,17 +30,27 @@ ifaces :
 		"02:00:00:00:00:00",
 		"02:00:00:00:01:00",
 		"02:00:00:00:02:00",
-		"02:00:00:00:03:00"
+		"02:00:00:00:03:00",
+		"02:00:00:00:04:00",
+		"02:00:00:00:05:00",
+		"02:00:00:00:06:00"
 	];
+	enable_interference = true;
+};
 
-	links = (
-		(0, 1, 10),
-		(0, 2, 20),
-		(0, 3,-10),
-		(1, 2, 30),
-		(1, 3, 10),
-		(2, 3, 20)
+path_loss :
+{
+	positions = (
+		(-70.0,   0.0),
+		(  0.0,   0.0),
+		( 70.0,   0.0),
+		(130.0,  -2.0),
+		(130.0,  -1.0),
+		(130.0,   2.0),
+		(130.0,   1.0)
 	);
+	tx_powers = (15.0, 15.0, 15.0, 11.0, 11.0, 11.0, 11.0);
+	model_params = ("log_distance", 3.5, 0.0);
 };
 __EOM
 
@@ -89,16 +101,20 @@ winct=$i
 win=$session:$((winct+1)).0
 winct=$((winct+1))
 tmux new-window -a -t $session -n wmediumd
-tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
+tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg' C-m
 
-# start iperf server on 10.10.10.13
-tmux send-keys -t $session:4 'iperf -s' C-m
+# start iperf server on 10.10.10.14
+tmux send-keys -t $session:5 'iperf -s' C-m
+# start iperf server on 10.10.10.16
+tmux send-keys -t $session:7 'iperf -s' C-m
 
 # enable monitor
 tmux send-keys -t $session:0 'ip link set hwsim0 up' C-m
 
+tmux send-keys -t $session:4 'sleep 2; iperf -u -b 100000000 -c 10.10.10.14 -t 6' C-m
+tmux send-keys -t $session:6 'sleep 2; iperf -u -b 100000000 -c 10.10.10.16 -t 6' C-m
+
 tmux select-window -t $session:1
-tmux send-keys -t $session:1 'ping -c 5 10.10.10.13' C-m
-tmux send-keys -t $session:1 'iperf -c 10.10.10.13 -i 5 -t 120'
+tmux send-keys -t $session:1 'sleep 2; ping -c 5 10.10.10.12' C-m
 
 tmux attach

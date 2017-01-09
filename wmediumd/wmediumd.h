@@ -65,26 +65,8 @@ typedef uint64_t u64;
 #define min(x,y) ((x) < (y) ? (x) : (y))
 #endif
 
-struct wmediumd {
-	int timerfd;
-
-	struct nl_sock *sock;
-
-	int num_stas;
-	struct list_head stations;
-	int *snr_matrix;
-
-	struct nl_cb *cb;
-	struct nl_cache *cache;
-	struct genl_family *family;
-
-	u8 log_lvl;
-};
-
-struct hwsim_tx_rate {
-	signed char idx;
-	unsigned char count;
-};
+#define NOISE_LEVEL	(-91)
+#define CCA_THRESHOLD	(-90)
 
 struct wqueue {
 	struct list_head frames;
@@ -96,8 +78,52 @@ struct station {
 	int index;
 	u8 addr[ETH_ALEN];		/* virtual interface mac address */
 	u8 hwaddr[ETH_ALEN];		/* hardware address of hwsim radio */
+	double x, y;			/* position of the station [m] */
+	double dir_x, dir_y;		/* direction of the station [meter per MOVE_INTERVAL] */
+	int tx_power;			/* transmission power [dBm] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
+};
+
+struct wmediumd {
+	int timerfd;
+
+	struct nl_sock *sock;
+
+	int num_stas;
+	struct list_head stations;
+	struct station **sta_array;
+	int *snr_matrix;
+	double *error_prob_matrix;
+	struct intf_info *intf;
+	struct timespec intf_updated;
+#define MOVE_INTERVAL	(3) /* station movement interval [sec] */
+	struct timespec next_move;
+	void *path_loss_param;
+	float *per_matrix;
+	int per_matrix_row_num;
+	int per_matrix_signal_min;
+	int fading_coefficient;
+
+	struct nl_cb *cb;
+	struct nl_cache *cache;
+	struct genl_family *family;
+
+	int (*get_link_snr)(struct wmediumd *, struct station *,
+			    struct station *);
+	double (*get_error_prob)(struct wmediumd *, double, unsigned int, int,
+				 struct station *, struct station *);
+	int (*calc_path_loss)(void *, struct station *,
+			      struct station *);
+	void (*move_stations)(struct wmediumd *);
+	int (*get_fading_signal)(struct wmediumd *);
+
+	u8 log_lvl;
+};
+
+struct hwsim_tx_rate {
+	signed char idx;
+	unsigned char count;
 };
 
 struct frame {
@@ -107,6 +133,7 @@ struct frame {
 	u64 cookie;
 	int flags;
 	int signal;
+	int duration;
 	int tx_rates_count;
 	struct station *sender;
 	struct hwsim_tx_rate tx_rates[IEEE80211_TX_MAX_RATES];
@@ -114,8 +141,20 @@ struct frame {
 	u8 data[0];			/* frame contents */
 };
 
+struct log_distance_model_param {
+	double path_loss_exponent;
+	double Xg;
+};
+
+struct intf_info {
+	int signal;
+	int duration;
+	double prob_col;
+};
+
 void station_init_queues(struct station *station);
-double get_error_prob(double snr, unsigned int rate_idx, int frame_len);
+bool timespec_before(struct timespec *t1, struct timespec *t2);
+int read_per_file(struct wmediumd *ctx, const char *file_name);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 

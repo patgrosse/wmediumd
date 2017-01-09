@@ -1,6 +1,7 @@
 #!/bin/bash
 # 4 mesh nodes in a diamond topology
-# paths must go through one of two intermediate nodes.
+# node 1 and 2 moves along with y axis
+# ping will be lost until switching node 1 to node 2
 
 num_nodes=4
 session=wmediumd
@@ -30,15 +31,28 @@ ifaces :
 		"02:00:00:00:02:00",
 		"02:00:00:00:03:00"
 	];
+};
 
-	links = (
-		(0, 1, 10),
-		(0, 2, 20),
-		(0, 3,-10),
-		(1, 2, 30),
-		(1, 3, 10),
-		(2, 3, 20)
+model :
+{
+	type = "path_loss";
+	positions = (
+		(-50.0,   0.0),
+		(  0.0,  70.0),
+		(  0.0,-100.0),
+		( 50.0,   0.0)
 	);
+	directions = (
+		(  0.0,   0.0),
+		(  0.0,  10.0),
+		(  0.0,  10.0),
+		(  0.0,   0.0)
+	);
+	tx_powers = (15.0, 15.0, 15.0, 15.0);
+
+	model_name = "log_distance";
+	path_loss_exp = 3.5;
+	xg = 0.0;
 };
 __EOM
 
@@ -89,16 +103,13 @@ winct=$i
 win=$session:$((winct+1)).0
 winct=$((winct+1))
 tmux new-window -a -t $session -n wmediumd
-tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
 
-# start iperf server on 10.10.10.13
-tmux send-keys -t $session:4 'iperf -s' C-m
+tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
 
 # enable monitor
 tmux send-keys -t $session:0 'ip link set hwsim0 up' C-m
 
 tmux select-window -t $session:1
-tmux send-keys -t $session:1 'ping -c 5 10.10.10.13' C-m
-tmux send-keys -t $session:1 'iperf -c 10.10.10.13 -i 5 -t 120'
+tmux send-keys -t $session:1 'ping -c 15 10.10.10.13' C-m
 
 tmux attach

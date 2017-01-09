@@ -30,14 +30,16 @@ ifaces :
 		"02:00:00:00:02:00",
 		"02:00:00:00:03:00"
 	];
+};
 
+model:
+{
+	type = "prob";
+
+	default_prob = 1.0;
 	links = (
-		(0, 1, 10),
-		(0, 2, 20),
-		(0, 3,-10),
-		(1, 2, 30),
-		(1, 3, 10),
-		(2, 3, 20)
+		(0, 2, 0.000000),
+		(2, 3, 0.000000)
 	);
 };
 __EOM
@@ -89,7 +91,7 @@ winct=$i
 win=$session:$((winct+1)).0
 winct=$((winct+1))
 tmux new-window -a -t $session -n wmediumd
-tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
+tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg' C-m
 
 # start iperf server on 10.10.10.13
 tmux send-keys -t $session:4 'iperf -s' C-m
