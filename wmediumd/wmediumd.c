@@ -40,6 +40,7 @@
 #include "config.h"
 #include "wserver.h"
 #include "wmediumd_dynamic.h"
+#include "wserver_messages.h"
 
 static int index_to_rate[] = {
 	60, 90, 120, 180, 240, 360, 480, 540

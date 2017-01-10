@@ -167,7 +167,7 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
         response.update_result = WUPDATE_SUCCESS;
     }
     pthread_mutex_unlock(&snr_lock);
-    int ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_UPDATE_RESPONSE_TYPE);
+    int ret = wserver_send_msg(ctx->sock_fd, &response, snr_update_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
@@ -193,7 +193,7 @@ int handle_delete_by_id_request(struct request_ctx *ctx, station_del_by_id_reque
                 "Station with ID %d successfully deleted\n", request->id);
         response.update_result = WUPDATE_SUCCESS;
     }
-    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_ID_RESPONSE_TYPE);
+    ret = wserver_send_msg(ctx->sock_fd, &response, station_del_by_id_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on delete by id response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
@@ -219,7 +219,7 @@ int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_req
                 "Station with MAC " MAC_FMT " successfully deleted\n", MAC_ARGS(request->addr));
         response.update_result = WUPDATE_SUCCESS;
     }
-    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
+    ret = wserver_send_msg(ctx->sock_fd, &response, station_del_by_mac_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on delete by mac response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
@@ -247,7 +247,7 @@ int handle_add_request(struct request_ctx *ctx, station_add_request *request) {
         response.created_id = (u8) ret;
         response.update_result = WUPDATE_SUCCESS;
     }
-    ret = wserver_send_msg(ctx->sock_fd, &response, WSERVER_ADD_RESPONSE_TYPE);
+    ret = wserver_send_msg(ctx->sock_fd, &response, station_add_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on add response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
@@ -266,43 +266,40 @@ int parse_recv_msg_rest_error(struct wmediumd *ctx, int value) {
 
 int receive_handle_request(struct request_ctx *ctx) {
     wserver_msg base;
-    int ret = wserver_recv_msg_base(ctx->sock_fd, &base);
+    int recv_type;
+    int ret = wserver_recv_msg_base(ctx->sock_fd, &base, &recv_type);
     if (ret > 0) {
         return ret;
     } else if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on receive base request: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
-    if (base.type == WSERVER_SHUTDOWN_REQUEST_TYPE) {
+    if (recv_type == WSERVER_SHUTDOWN_REQUEST_TYPE) {
         return WACTION_CLOSE;
-    } else if (base.type == WSERVER_UPDATE_REQUEST_TYPE) {
+    } else if (recv_type == WSERVER_UPDATE_REQUEST_TYPE) {
         snr_update_request request;
-        request.base = base;
-        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_UPDATE_REQUEST_TYPE))) {
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, snr_update_request))) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_update_request(ctx, &request);
         }
-    } else if (base.type == WSERVER_DEL_BY_MAC_REQUEST_TYPE) {
+    } else if (recv_type == WSERVER_DEL_BY_MAC_REQUEST_TYPE) {
         station_del_by_mac_request request;
-        request.base = base;
-        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_DEL_BY_MAC_REQUEST_TYPE))) {
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, station_del_by_mac_request))) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_delete_by_mac_request(ctx, &request);
         }
-    } else if (base.type == WSERVER_DEL_BY_ID_REQUEST_TYPE) {
+    } else if (recv_type == WSERVER_DEL_BY_ID_REQUEST_TYPE) {
         station_del_by_id_request request;
-        request.base = base;
-        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_DEL_BY_ID_REQUEST_TYPE))) {
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, station_del_by_id_request))) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_delete_by_id_request(ctx, &request);
         }
-    } else if (base.type == WSERVER_ADD_REQUEST_TYPE) {
+    } else if (recv_type == WSERVER_ADD_REQUEST_TYPE) {
         station_add_request request;
-        request.base = base;
-        if ((ret = wserver_recv_msg_rest(ctx->sock_fd, &request, WSERVER_ADD_REQUEST_TYPE))) {
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, station_add_request))) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_add_request(ctx, &request);

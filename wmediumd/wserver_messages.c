@@ -19,71 +19,102 @@
  */
 
 #include <sys/socket.h>
-#include <errno.h>
+#include <memory.h>
 #include "wserver_messages.h"
+#include "wserver_messages_network.h"
 
-int sendfull(int sock, const void *buf, size_t len, size_t shift, int flags) {
-    size_t total = 0;
-    size_t bytesleft = len;
-    ssize_t currsent = 0;
-    while (total < len) {
-        currsent = send(sock, buf + shift + total, bytesleft, flags);
-        if (currsent == -1) {
-            if (errno == EPIPE || errno == ECONNRESET) {
-                return WACTION_DISCONNECTED;
-            } else {
-                return -errno;
-            }
-        }
-        total += currsent;
-        bytesleft -= currsent;
+
+#define align_send_msg(sock_fd, elem, type, typeint) \
+    type tosend; \
+    *((int *) elem) = typeint; \
+    memcpy(&tosend, elem, sizeof(type)); \
+    hton_type(&tosend, type);\
+    return sendfull(sock_fd, &tosend, sizeof(type), 0, MSG_NOSIGNAL);
+
+#define align_recv_msg(sock_fd, elem, elemtype, typeint) \
+    int ret; \
+    ret = recvfull(sock_fd, elem, sizeof(elemtype) - sizeof(wserver_msg), sizeof(wserver_msg), 0); \
+    ntoh_type(elem, elemtype); \
+    elem->base.type = typeint; \
+    return ret;
+
+
+int send_snr_update_request(int sock, const snr_update_request *elem) {
+    align_send_msg(sock, elem, snr_update_request, WSERVER_UPDATE_REQUEST_TYPE)
+}
+
+int send_snr_update_response(int sock, const snr_update_response *elem) {
+    align_send_msg(sock, elem, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE)
+}
+
+int send_station_del_by_mac_request(int sock, const station_del_by_mac_request *elem) {
+    align_send_msg(sock, elem, station_del_by_mac_request, WSERVER_DEL_BY_MAC_REQUEST_TYPE)
+}
+
+int send_station_del_by_mac_response(int sock, const station_del_by_mac_response *elem) {
+    align_send_msg(sock, elem, station_del_by_mac_response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE)
+}
+
+int send_station_del_by_id_request(int sock, const station_del_by_id_request *elem) {
+    align_send_msg(sock, elem, station_del_by_id_request, WSERVER_DEL_BY_ID_REQUEST_TYPE)
+}
+
+int send_station_del_by_id_response(int sock, const station_del_by_id_response *elem) {
+    align_send_msg(sock, elem, station_del_by_id_response, WSERVER_DEL_BY_ID_RESPONSE_TYPE)
+}
+
+int send_station_add_request(int sock, const station_add_request *elem) {
+    align_send_msg(sock, elem, station_add_request, WSERVER_ADD_REQUEST_TYPE)
+}
+
+int send_station_add_response(int sock, const station_add_response *elem) {
+    align_send_msg(sock, elem, station_add_response, WSERVER_ADD_RESPONSE_TYPE)
+}
+
+int recv_snr_update_request(int sock, snr_update_request *elem) {
+    align_recv_msg(sock, elem, snr_update_request, WSERVER_UPDATE_REQUEST_TYPE)
+}
+
+int recv_snr_update_response(int sock, snr_update_response *elem) {
+    align_recv_msg(sock, elem, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_station_del_by_mac_request(int sock, station_del_by_mac_request *elem) {
+    align_recv_msg(sock, elem, station_del_by_mac_request, WSERVER_DEL_BY_MAC_REQUEST_TYPE)
+}
+
+int recv_station_del_by_mac_response(int sock, station_del_by_mac_response *elem) {
+    align_recv_msg(sock, elem, station_del_by_mac_response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE)
+}
+
+int recv_station_del_by_id_request(int sock, station_del_by_id_request *elem) {
+    align_recv_msg(sock, elem, station_del_by_id_request, WSERVER_DEL_BY_ID_REQUEST_TYPE)
+}
+
+int recv_station_del_by_id_response(int sock, station_del_by_id_response *elem) {
+    align_recv_msg(sock, elem, station_del_by_id_response, WSERVER_DEL_BY_ID_RESPONSE_TYPE)
+}
+
+int recv_station_add_request(int sock, station_add_request *elem) {
+    align_recv_msg(sock, elem, station_add_request, WSERVER_ADD_REQUEST_TYPE)
+}
+
+int recv_station_add_response(int sock, station_add_response *elem) {
+    align_recv_msg(sock, elem, station_add_response, WSERVER_ADD_RESPONSE_TYPE)
+}
+
+int wserver_recv_msg_base(int sock_fd, wserver_msg *base, int *recv_type) {
+    int ret = recvfull(sock_fd, base, sizeof(wserver_msg), 0, 0);
+    if (ret) {
+        return ret;
     }
-    return WACTION_CONTINUE;
+    ntoh_base(base);
+    *recv_type = base->type;
+    hton_base(base);
+    return 0;
 }
 
-int recvfull(int sock, void *buf, size_t len, size_t shift, int flags) {
-    size_t total = 0;
-    size_t bytesleft = len;
-    ssize_t currrecv = 0;
-    while (total < len) {
-        currrecv = recv(sock, buf + shift + total, bytesleft, flags);
-        if (currrecv == -1) {
-            if (errno == EPIPE || errno == ECONNRESET) {
-                return WACTION_DISCONNECTED;
-            } else {
-                return -errno;
-            }
-        } else if (currrecv == 0) {
-            return WACTION_DISCONNECTED;
-        }
-        total += currrecv;
-        bytesleft -= currrecv;
-    }
-    return WACTION_CONTINUE;
-}
-
-int wserver_recv_msg_base(int sock_fd, wserver_msg *base) {
-    return recvfull(sock_fd, base, sizeof(wserver_msg), 0, 0);
-}
-
-int wserver_recv_msg_rest(int sock_fd, void *buf, u8 type) {
-    ssize_t size = get_msg_size_by_type(type);
-    if (size < 0) {
-        return -EINVAL;
-    }
-    return recvfull(sock_fd, buf, (size_t) (size - sizeof(wserver_msg)), sizeof(wserver_msg), 0);
-}
-
-int wserver_send_msg(int sock_fd, const void *buf, u8 type) {
-    ssize_t size = get_msg_size_by_type(type);
-    if (size < 0) {
-        return -EINVAL;
-    }
-    *((u8 *) buf) = type;
-    return sendfull(sock_fd, buf, (size_t) size, 0, MSG_NOSIGNAL);
-}
-
-ssize_t get_msg_size_by_type(u8 type) {
+ssize_t get_msg_size_by_type(int type) {
     switch (type) {
         case WSERVER_SHUTDOWN_REQUEST_TYPE:
             return sizeof(wserver_msg);

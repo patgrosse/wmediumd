@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include "wmediumd_dynamic.h"
 
+#define DEFAULT_DYNAMIC_SNR -10
+
 pthread_mutex_t snr_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **backup) {
@@ -66,12 +68,12 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
         }
     }
 
-    // Fill last lines with null
+    // Fill last lines with default snr
     for (int x = 0; x < newnum; x++) {
-        ctx->snr_matrix[x * newnum + oldnum] = 0;
+        ctx->snr_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_SNR;
     }
     for (int y = 0; y < newnum; y++) {
-        ctx->snr_matrix[oldnum * newnum + y] = 0;
+        ctx->snr_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_SNR;
     }
 
     // Init new station object

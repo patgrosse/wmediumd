@@ -25,39 +25,41 @@
 #include <sys/socket.h>
 
 
-void send_request(int connection_soc, void *request, u8 type) {
-    int ret = wserver_send_msg(connection_soc, request, type);
-    if (ret < 0) {
-        perror("error while sending");
-        close(connection_soc);
-        exit(EXIT_FAILURE);
+#define send_request(connection_soc, request, type) \
+    { \
+        int ret = wserver_send_msg(connection_soc, request, type); \
+        if (ret < 0) { \
+            perror("error while sending"); \
+            close(connection_soc); \
+            exit(EXIT_FAILURE); \
+        } \
+        printf("sent request\n"); \
     }
-    printf("sent request\n");
-}
 
-void receive_response(const int connection_soc, void *response, u8 type) {
-    wserver_msg base;
-    int ret = wserver_recv_msg_base(connection_soc, &base);
-    if (ret < 0) {
-        perror("error while receiving");
-        close(connection_soc);
-        exit(EXIT_FAILURE);
+
+#define receive_response(connection_soc, response, elemtype, typeint) \
+    { \
+    wserver_msg base; \
+    int recv_type; \
+    int ret = wserver_recv_msg_base(connection_soc, &base, &recv_type); \
+    if (ret < 0) { \
+        perror("error while receiving"); \
+        close(connection_soc); \
+        exit(EXIT_FAILURE); \
+    } \
+    if (recv_type != typeint) { \
+        fprintf(stderr, "Received invalid request of type %d", recv_type); \
+        close(connection_soc); \
+        exit(EXIT_FAILURE); \
+    } \
+    ret = wserver_recv_msg(connection_soc, response, elemtype); \
+    if (ret < 0) { \
+        perror("error while receiving"); \
+        close(connection_soc); \
+        exit(EXIT_FAILURE); \
+    } \
+    printf("received response of type %d\n", typeint); \
     }
-    if (base.type != type) {
-        fprintf(stderr, "Received invalid request of type %d", base.type);
-        close(connection_soc);
-        exit(EXIT_FAILURE);
-    }
-    wserver_msg *base_ptr = response;
-    *base_ptr = base;
-    ret = wserver_recv_msg_rest(connection_soc, response, base.type);
-    if (ret < 0) {
-        perror("error while receiving");
-        close(connection_soc);
-        exit(EXIT_FAILURE);
-    }
-    printf("received response of type %d\n", type);
-}
 
 void string_to_mac_address(const char *str, u8 *addr) {
     int a[ETH_ALEN];
@@ -92,9 +94,9 @@ int main() {
         printf("==== station add\n");
         station_add_request request;
         string_to_mac_address("02:00:00:00:02:00", request.addr);
-        send_request(create_socket, &request, WSERVER_ADD_REQUEST_TYPE);
+        send_request(create_socket, &request, station_add_request);
         station_add_response response;
-        receive_response(create_socket, &response, WSERVER_ADD_RESPONSE_TYPE);
+        receive_response(create_socket, &response, station_add_response, WSERVER_ADD_RESPONSE_TYPE);
         printf("answer was: %d\n", response.update_result);
 
         printf("==== snr update 1\n");
@@ -102,9 +104,9 @@ int main() {
         string_to_mac_address("02:00:00:00:01:00", request2.from_addr);
         string_to_mac_address("02:00:00:00:02:00", request2.to_addr);
         request2.snr = 15;
-        send_request(create_socket, &request2, WSERVER_UPDATE_REQUEST_TYPE);
+        send_request(create_socket, &request2, snr_update_request);
         snr_update_response response2;
-        receive_response(create_socket, &response2, WSERVER_UPDATE_RESPONSE_TYPE);
+        receive_response(create_socket, &response2, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE);
         printf("answer was: %d\n", response2.update_result);
 
         printf("==== snr update 2\n");
@@ -112,18 +114,18 @@ int main() {
         string_to_mac_address("02:00:00:00:02:00", request3.from_addr);
         string_to_mac_address("02:00:00:00:01:00", request3.to_addr);
         request3.snr = 15;
-        send_request(create_socket, &request3, WSERVER_UPDATE_REQUEST_TYPE);
+        send_request(create_socket, &request3, snr_update_request);
         snr_update_response response3;
-        receive_response(create_socket, &response3, WSERVER_UPDATE_RESPONSE_TYPE);
+        receive_response(create_socket, &response3, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE);
         printf("answer was: %d\n", response3.update_result);
 
 
         printf("==== station del\n");
         station_del_by_mac_request request4;
         string_to_mac_address("02:00:00:00:02:00", request4.addr);
-        send_request(create_socket, &request4, WSERVER_DEL_BY_MAC_REQUEST_TYPE);
+        send_request(create_socket, &request4, station_del_by_mac_request);
         station_del_by_mac_response response4;
-        receive_response(create_socket, &response4, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
+        receive_response(create_socket, &response4, station_del_by_mac_response, WSERVER_DEL_BY_MAC_RESPONSE_TYPE);
         printf("answer was: %d\n", response4.update_result);
 
         close(create_socket);
