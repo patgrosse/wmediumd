@@ -25,7 +25,7 @@
 
 #define DEFAULT_DYNAMIC_SNR -10
 
-pthread_mutex_t snr_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t snr_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **backup) {
     if (backup) {
@@ -50,7 +50,7 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
             return -EEXIST;
     }
 
-    pthread_mutex_lock(&snr_lock);
+    pthread_rwlock_wrlock(&snr_lock);
     int oldnum = ctx->num_stas;
     int newnum = oldnum + 1;
 
@@ -92,7 +92,7 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     ret = station->index;
 
     out:
-    pthread_mutex_unlock(&snr_lock);
+    pthread_rwlock_unlock(&snr_lock);
     return ret;
 }
 
@@ -144,7 +144,7 @@ int del_station(struct wmediumd *ctx, struct station *station) {
 }
 
 int del_station_by_id(struct wmediumd *ctx, const int id) {
-    pthread_mutex_lock(&snr_lock);
+    pthread_rwlock_wrlock(&snr_lock);
     int ret;
     struct station *station;
     list_for_each_entry(station, &ctx->stations, list) {
@@ -156,12 +156,12 @@ int del_station_by_id(struct wmediumd *ctx, const int id) {
 
     out:
     ret = -ENODEV;
-    pthread_mutex_unlock(&snr_lock);
+    pthread_rwlock_unlock(&snr_lock);
     return ret;
 }
 
 int del_station_by_mac(struct wmediumd *ctx, const u8 *addr) {
-    pthread_mutex_lock(&snr_lock);
+    pthread_rwlock_wrlock(&snr_lock);
     int ret;
     struct station *station;
     list_for_each_entry(station, &ctx->stations, list) {
@@ -173,6 +173,6 @@ int del_station_by_mac(struct wmediumd *ctx, const u8 *addr) {
     ret = -ENODEV;
     
     out:
-    pthread_mutex_unlock(&snr_lock);
+    pthread_rwlock_unlock(&snr_lock);
     return ret;
 }

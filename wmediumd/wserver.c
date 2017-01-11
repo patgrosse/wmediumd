@@ -62,22 +62,12 @@ static struct event_base *server_event_base;
 static __sighandler_t old_sig_handler;
 
 /**
- * Shutdown the server
- */
-void shutdown_wserver() {
-    signal(SIGINT, old_sig_handler);
-    printf("\n" LOG_PREFIX "shutting down wserver\n");
-    close(listen_soc);
-    unlink(WSERVER_SOCKET_PATH);
-}
-
-/**
  * Handle the SIGINT signal
  * @param param The param passed to by signal()
  */
 void handle_sigint(int param) {
     UNUSED(param);
-    shutdown_wserver();
+    stop_wserver();
     exit(EXIT_SUCCESS);
 }
 
@@ -144,7 +134,7 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
     struct station *receiver = NULL;
     struct station *station;
 
-    pthread_mutex_lock(&snr_lock);
+    pthread_rwlock_wrlock(&snr_lock);
 
     list_for_each_entry(station, &ctx->ctx->stations, list) {
         if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
@@ -166,7 +156,7 @@ int handle_update_request(struct request_ctx *ctx, const snr_update_request *req
         ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
         response.update_result = WUPDATE_SUCCESS;
     }
-    pthread_mutex_unlock(&snr_lock);
+    pthread_rwlock_unlock(&snr_lock);
     int ret = wserver_send_msg(ctx->sock_fd, &response, snr_update_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s\n", strerror(abs(ret)));
@@ -385,7 +375,7 @@ void *run_wserver(void *ctx) {
 
     event_free(accept_event);
     event_base_free(server_event_base);
-    shutdown_wserver();
+    stop_wserver();
     return NULL;
 }
 
@@ -393,8 +383,11 @@ int start_wserver(struct wmediumd *ctx) {
     return pthread_create(&server_thread, NULL, run_wserver, ctx);
 }
 
-int stop_wserver() {
-    int pthread_val = pthread_cancel(server_thread);
-    shutdown_wserver();
-    return pthread_val;
+void stop_wserver() {
+    signal(SIGINT, old_sig_handler);
+    pthread_cancel(server_thread);
+    pthread_detach(server_thread);
+    printf("\n" LOG_PREFIX "shutting down wserver\n");
+    close(listen_soc);
+    unlink(WSERVER_SOCKET_PATH);
 }

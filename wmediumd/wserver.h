@@ -38,9 +38,8 @@ int start_wserver(struct wmediumd *ctx);
 
 /**
  * Stop the server if active
- * @return 0 on success
  */
-int stop_wserver();
+void stop_wserver();
 
 /**
  * Handle a snr_update_request and pass it to wmediumd

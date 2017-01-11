@@ -62,6 +62,6 @@ int del_station_by_mac(struct wmediumd *ctx, const u8 *addr);
 /**
  * Lock for the snr matrix/station list
  */
-extern pthread_mutex_t snr_lock;
+extern pthread_rwlock_t snr_lock;
 
 #endif //WMEDIUMD_WMEDIUMD_DYNAMIC_H

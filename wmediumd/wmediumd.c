@@ -701,7 +701,7 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 	u8 *src;
 
 	if (gnlh->cmd == HWSIM_CMD_FRAME) {
-		pthread_mutex_lock(&snr_lock);
+		pthread_rwlock_rdlock(&snr_lock);
 		/* we get the attributes*/
 		genlmsg_parse(nlh, 0, attrs, HWSIM_ATTR_MAX, NULL);
 		if (attrs[HWSIM_ATTR_ADDR_TRANSMITTER]) {
@@ -748,7 +748,7 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			queue_frame(ctx, sender, frame);
 		}
 out:
-		pthread_mutex_unlock(&snr_lock);
+		pthread_rwlock_unlock(&snr_lock);
 	}
 	return 0;
 }
@@ -864,11 +864,11 @@ static void timer_cb(int fd, short what, void *data)
 {
 	struct wmediumd *ctx = data;
 
-	pthread_mutex_lock(&snr_lock);
+	pthread_rwlock_rdlock(&snr_lock);
 	ctx->move_stations(ctx);
 	deliver_expired_frames(ctx);
 	rearm_timer(ctx);
-	pthread_mutex_unlock(&snr_lock);
+	pthread_rwlock_unlock(&snr_lock);
 }
 
 int main(int argc, char *argv[])
