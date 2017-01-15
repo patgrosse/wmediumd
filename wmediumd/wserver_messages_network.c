@@ -72,7 +72,7 @@ void ntohi_wrapper(int *value) {
 }
 
 void hton_base(wserver_msg *elem) {
-    htoni_wrapper(&elem->type);
+    UNUSED(elem);
 }
 
 void hton_snr_update_request(snr_update_request *elem) {
@@ -83,7 +83,6 @@ void hton_snr_update_request(snr_update_request *elem) {
 void hton_snr_update_response(snr_update_response *elem) {
     hton_base(&elem->base);
     hton_snr_update_request(&elem->request);
-    htoni_wrapper(&elem->update_result);
 }
 
 void hton_station_del_by_mac_request(station_del_by_mac_request *elem) {
@@ -93,7 +92,6 @@ void hton_station_del_by_mac_request(station_del_by_mac_request *elem) {
 void hton_station_del_by_mac_response(station_del_by_mac_response *elem) {
     hton_base(&elem->base);
     hton_station_del_by_mac_request(&elem->request);
-    htoni_wrapper(&elem->update_result);
 }
 
 void hton_station_del_by_id_request(station_del_by_id_request *elem) {
@@ -104,7 +102,6 @@ void hton_station_del_by_id_request(station_del_by_id_request *elem) {
 void hton_station_del_by_id_response(station_del_by_id_response *elem) {
     hton_base(&elem->base);
     hton_station_del_by_id_request(&elem->request);
-    htoni_wrapper(&elem->update_result);
 }
 
 void hton_station_add_request(station_add_request *elem) {
@@ -115,11 +112,10 @@ void hton_station_add_response(station_add_response *elem) {
     hton_base(&elem->base);
     hton_station_add_request(&elem->request);
     htoni_wrapper(&elem->created_id);
-    htoni_wrapper(&elem->update_result);
 }
 
 void ntoh_base(wserver_msg *elem) {
-    ntohi_wrapper(&elem->type);
+    UNUSED(elem);
 }
 
 void ntoh_snr_update_request(snr_update_request *elem) {
@@ -130,7 +126,6 @@ void ntoh_snr_update_request(snr_update_request *elem) {
 void ntoh_snr_update_response(snr_update_response *elem) {
     ntoh_base(&elem->base);
     ntoh_snr_update_request(&elem->request);
-    ntohi_wrapper(&elem->update_result);
 }
 
 void ntoh_station_del_by_mac_request(station_del_by_mac_request *elem) {
@@ -140,7 +135,6 @@ void ntoh_station_del_by_mac_request(station_del_by_mac_request *elem) {
 void ntoh_station_del_by_mac_response(station_del_by_mac_response *elem) {
     ntoh_base(&elem->base);
     ntoh_station_del_by_mac_request(&elem->request);
-    ntohi_wrapper(&elem->update_result);
 }
 
 void ntoh_station_del_by_id_request(station_del_by_id_request *elem) {
@@ -151,7 +145,6 @@ void ntoh_station_del_by_id_request(station_del_by_id_request *elem) {
 void ntoh_station_del_by_id_response(station_del_by_id_response *elem) {
     ntoh_base(&elem->base);
     ntoh_station_del_by_id_request(&elem->request);
-    ntohi_wrapper(&elem->update_result);
 }
 
 void ntoh_station_add_request(station_add_request *elem) {
@@ -162,5 +155,4 @@ void ntoh_station_add_response(station_add_response *elem) {
     ntoh_base(&elem->base);
     ntoh_station_add_request(&elem->request);
     ntohi_wrapper(&elem->created_id);
-    ntohi_wrapper(&elem->update_result);
 }

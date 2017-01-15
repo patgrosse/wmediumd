@@ -26,6 +26,7 @@
 #include "wmediumd.h"
 
 typedef uint8_t u8;
+typedef int32_t i32;
 
 /**
  * Add a station
@@ -49,7 +50,7 @@ int del_station(struct wmediumd *ctx, struct station *station);
  * @param id The ID of the station
  * @return 0 on success otherwise a negative errno value
  */
-int del_station_by_id(struct wmediumd *ctx, const int id);
+int del_station_by_id(struct wmediumd *ctx, const i32 id);
 
 /**
  * Delete a station by its address

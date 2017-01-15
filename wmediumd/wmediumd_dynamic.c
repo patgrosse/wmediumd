@@ -143,7 +143,7 @@ int del_station(struct wmediumd *ctx, struct station *station) {
     return 0;
 }
 
-int del_station_by_id(struct wmediumd *ctx, const int id) {
+int del_station_by_id(struct wmediumd *ctx, const i32 id) {
     pthread_rwlock_wrlock(&snr_lock);
     int ret;
     struct station *station;

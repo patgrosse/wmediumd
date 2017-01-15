@@ -48,65 +48,69 @@
 #define WSERVER_ADD_REQUEST_TYPE 7
 #define WSERVER_ADD_RESPONSE_TYPE 8
 
-typedef uint8_t u8;
+#ifndef __packed
+#define __packed __attribute__((packed))
+#endif
 
-typedef struct {
-    int type;
+typedef uint8_t u8;
+typedef int32_t i32;
+
+/*
+ * Macro for unused parameters
+ */
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
+#endif
+
+typedef struct __packed {
+    u8 type;
 } wserver_msg;
 
-typedef struct {
-    u8 pad[2];
-} address_padding;
-
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     u8 from_addr[ETH_ALEN];
-    address_padding _pad1;
     u8 to_addr[ETH_ALEN];
-    address_padding _pad2;
-    int snr;
+    i32 snr;
 } snr_update_request;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     snr_update_request request;
-    int update_result;
+    u8 update_result;
 } snr_update_response;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     u8 addr[ETH_ALEN];
-    address_padding _pad1;
 } station_del_by_mac_request;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     station_del_by_mac_request request;
-    int update_result;
+    u8 update_result;
 } station_del_by_mac_response;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
-    int id;
+    i32 id;
 } station_del_by_id_request;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     station_del_by_id_request request;
-    int update_result;
+    u8 update_result;
 } station_del_by_id_response;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     u8 addr[ETH_ALEN];
-    address_padding _pad1;
 } station_add_request;
 
-typedef struct {
+typedef struct __packed {
     wserver_msg base;
     station_add_request request;
-    int created_id;
-    int update_result;
+    i32 created_id;
+    u8 update_result;
 } station_add_response;
 
 /**

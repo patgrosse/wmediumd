@@ -33,11 +33,6 @@
 #include "wserver.h"
 #include "wmediumd_dynamic.h"
 
-/*
- * Macro for unused parameters
- */
-#define UNUSED(x) (void)(x)
-
 
 #define LOG_PREFIX "W_SRV: "
 
@@ -234,7 +229,7 @@ int handle_add_request(struct request_ctx *ctx, station_add_request *request) {
     } else {
         w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX
                 "Added station with MAC " MAC_FMT " and ID %d\n", MAC_ARGS(request->addr), ret);
-        response.created_id = (u8) ret;
+        response.created_id = ret;
         response.update_result = WUPDATE_SUCCESS;
     }
     ret = wserver_send_msg(ctx->sock_fd, &response, station_add_response);
