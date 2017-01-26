@@ -82,7 +82,7 @@ int main() {
         printf("Socket has been created\n");
     } else {
         perror("Socket creation failed");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     address.sun_family = AF_LOCAL;
     strcpy(address.sun_path, WSERVER_SOCKET_PATH);
@@ -130,8 +130,9 @@ int main() {
 
         close(create_socket);
         printf("socket closed\n");
+        return EXIT_SUCCESS;
     } else {
         perror("Server connection failed");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 }
