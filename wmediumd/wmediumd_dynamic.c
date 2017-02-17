@@ -24,24 +24,15 @@
 #include "wmediumd_dynamic.h"
 
 #define DEFAULT_DYNAMIC_SNR -10
+#define DEFAULT_DYNAMIC_ERRPROB 1.0
 
 pthread_rwlock_t snr_lock = PTHREAD_RWLOCK_INITIALIZER;
 
-int switch_matrix(int **matrix_loc, const int oldsize, const int newsize, int **backup) {
-    if (backup) {
-        *backup = malloc(sizeof(int) * oldsize * oldsize);
-        if (!*backup) {
-            return -ENOMEM;
-        }
-        memcpy(*backup, *matrix_loc, sizeof(int) * oldsize * oldsize);
-    }
-    free(*matrix_loc);
-    *matrix_loc = malloc(sizeof(int) * newsize * newsize);
-    if (!*matrix_loc) {
-        return -ENOMEM;
-    }
-    return 0;
-}
+#define swap_matrix(matrix_ptr, oldsize, newsize, elem_type, backup_ptr) \
+    backup_ptr = malloc(sizeof(elem_type) * oldsize * oldsize); \
+    memcpy(backup_ptr, matrix_ptr, sizeof(elem_type) * oldsize * oldsize); \
+    free(matrix_ptr); \
+    matrix_ptr = malloc(sizeof(elem_type) * newsize * newsize);
 
 int add_station(struct wmediumd *ctx, const u8 addr[]) {
     struct station *sta_loop;
@@ -51,29 +42,53 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     }
 
     pthread_rwlock_wrlock(&snr_lock);
-    int oldnum = ctx->num_stas;
-    int newnum = oldnum + 1;
+    size_t oldnum = (size_t) ctx->num_stas;
+    size_t newnum = oldnum + 1;
 
     // Save old matrix and init new matrix
-    int *oldmatrix;
+    union {
+        int *old_snr_matrix;
+        double *old_errprob_matrix;
+    } matrizes;
     int ret;
-    if ((ret = switch_matrix(&ctx->snr_matrix, oldnum, newnum, &oldmatrix))) {
-        goto out;
+    if (ctx->error_prob_matrix == NULL) {
+        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
+    } else {
+        swap_matrix(ctx->error_prob_matrix, oldnum, newnum, double, matrizes.old_errprob_matrix);
     }
 
     // Copy old matrix
-    for (int x = 0; x < oldnum; x++) {
-        for (int y = 0; y < oldnum; y++) {
-            ctx->snr_matrix[x * newnum + y] = oldmatrix[x * oldnum + y];
+    for (size_t x = 0; x < oldnum; x++) {
+        for (size_t y = 0; y < oldnum; y++) {
+            if (ctx->error_prob_matrix == NULL) {
+                ctx->snr_matrix[x * newnum + y] = matrizes.old_snr_matrix[x * oldnum + y];
+            } else {
+                ctx->error_prob_matrix[x * newnum + y] = matrizes.old_errprob_matrix[x * oldnum + y];
+            }
         }
     }
 
     // Fill last lines with default snr
-    for (int x = 0; x < newnum; x++) {
-        ctx->snr_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_SNR;
+    for (size_t x = 0; x < newnum; x++) {
+        if (ctx->error_prob_matrix == NULL) {
+            ctx->snr_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_SNR;
+        } else {
+            ctx->error_prob_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_ERRPROB;
+        }
     }
-    for (int y = 0; y < newnum; y++) {
-        ctx->snr_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_SNR;
+    for (size_t y = 0; y < newnum; y++) {
+        if (ctx->error_prob_matrix == NULL) {
+            ctx->snr_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_SNR;
+        } else {
+            ctx->error_prob_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_ERRPROB;
+        }
+    }
+
+
+    if (ctx->error_prob_matrix == NULL) {
+        free(matrizes.old_snr_matrix);
+    } else {
+        free(matrizes.old_errprob_matrix);
     }
 
     // Init new station object
@@ -83,12 +98,12 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
         ret = -ENOMEM;
         goto out;
     }
-    station->index = oldnum;
+    station->index = (int) oldnum;
     memcpy(station->addr, addr, ETH_ALEN);
     memcpy(station->hwaddr, addr, ETH_ALEN);
     station_init_queues(station);
     list_add_tail(&station->list, &ctx->stations);
-    ctx->num_stas = newnum;
+    ctx->num_stas = (int) newnum;
     ret = station->index;
 
     out:
@@ -100,17 +115,21 @@ int del_station(struct wmediumd *ctx, struct station *station) {
     if (ctx->num_stas == 0) {
         return -ENXIO;
     }
-    int oldnum = ctx->num_stas;
-    int newnum = oldnum - 1;
+    size_t oldnum = (size_t) ctx->num_stas;
+    size_t newnum = oldnum - 1;
 
     // Save old matrix and init new matrix
-    int *oldmatrix;
-    int ret;
-    if ((ret = switch_matrix(&ctx->snr_matrix, oldnum, newnum, &oldmatrix))) {
-        return ret;
+    union {
+        int *old_snr_matrix;
+        double *old_errprob_matrix;
+    } matrizes;
+    if (ctx->error_prob_matrix == NULL) {
+        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
+    } else {
+        swap_matrix(ctx->error_prob_matrix, oldnum, newnum, double, matrizes.old_errprob_matrix);
     }
 
-    int index = station->index;
+    size_t index = (size_t) station->index;
 
     // Decreasing index of stations following deleted station
     struct station *sta_loop = station;
@@ -120,24 +139,32 @@ int del_station(struct wmediumd *ctx, struct station *station) {
 
     // Copy all values not related to deleted station
     int xnew = 0;
-    for (int x = 0; x < oldnum; x++) {
+    for (size_t x = 0; x < oldnum; x++) {
         if (x == index) {
             continue;
         }
         int ynew = 0;
-        for (int y = 0; y < oldnum; y++) {
+        for (size_t y = 0; y < oldnum; y++) {
             if (y == index) {
                 continue;
             }
-            ctx->snr_matrix[xnew * newnum + ynew] = oldmatrix[x * oldnum + y];
+            if (ctx->error_prob_matrix == NULL) {
+                ctx->snr_matrix[xnew * newnum + ynew] = matrizes.old_snr_matrix[x * oldnum + y];
+            } else {
+                ctx->error_prob_matrix[xnew * newnum + ynew] = matrizes.old_errprob_matrix[x * oldnum + y];
+            }
             ynew++;
         }
         xnew++;
     }
-    free(oldmatrix);
+    if (ctx->error_prob_matrix == NULL) {
+        free(matrizes.old_snr_matrix);
+    } else {
+        free(matrizes.old_errprob_matrix);
+    }
 
     list_del(&station->list);
-    ctx->num_stas = newnum;
+    ctx->num_stas = (int) newnum;
 
     free(station);
     return 0;
@@ -171,7 +198,7 @@ int del_station_by_mac(struct wmediumd *ctx, const u8 *addr) {
         }
     }
     ret = -ENODEV;
-    
+
     out:
     pthread_rwlock_unlock(&snr_lock);
     return ret;

@@ -63,11 +63,19 @@ int recvfull(int sock, void *buf, size_t len, size_t shift, int flags) {
     return WACTION_CONTINUE;
 }
 
-void htoni_wrapper(int *value) {
+void htonu_wrapper(u32 *value) {
     *value = htonl(*value);
 }
 
-void ntohi_wrapper(int *value) {
+void ntohu_wrapper(u32 *value) {
+    *value = ntohl(*value);
+}
+
+void htoni_wrapper(i32 *value) {
+    *value = htonl(*value);
+}
+
+void ntohi_wrapper(i32 *value) {
     *value = ntohl(*value);
 }
 
@@ -83,6 +91,16 @@ void hton_snr_update_request(snr_update_request *elem) {
 void hton_snr_update_response(snr_update_response *elem) {
     hton_base(&elem->base);
     hton_snr_update_request(&elem->request);
+}
+
+void hton_errprob_update_request(errprob_update_request *elem) {
+    hton_base(&elem->base);
+    htonu_wrapper(&elem->errprob);
+}
+
+void hton_errprob_update_response(errprob_update_response *elem) {
+    hton_base(&elem->base);
+    hton_errprob_update_request(&elem->request);
 }
 
 void hton_station_del_by_mac_request(station_del_by_mac_request *elem) {
@@ -126,6 +144,16 @@ void ntoh_snr_update_request(snr_update_request *elem) {
 void ntoh_snr_update_response(snr_update_response *elem) {
     ntoh_base(&elem->base);
     ntoh_snr_update_request(&elem->request);
+}
+
+void ntoh_errprob_update_request(errprob_update_request *elem) {
+    ntoh_base(&elem->base);
+    ntohu_wrapper(&elem->errprob);
+}
+
+void ntoh_errprob_update_response(errprob_update_response *elem) {
+    ntoh_base(&elem->base);
+    ntoh_errprob_update_request(&elem->request);
 }
 
 void ntoh_station_del_by_mac_request(station_del_by_mac_request *elem) {

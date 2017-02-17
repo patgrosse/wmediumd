@@ -33,20 +33,23 @@
 #define WUPDATE_SUCCESS 0 /* update of SNR successful */
 #define WUPDATE_INTF_NOTFOUND 1 /* unknown interface */
 #define WUPDATE_INTF_DUPLICATE 2 /* interface already exists */
+#define WUPDATE_WRONG_MODE 3 /* tried to update snr in errprob mode or vice versa */
 
 /* Socket location following FHS guidelines:
  * http://www.pathname.com/fhs/pub/fhs-2.3.html#PURPOSE46 */
 #define WSERVER_SOCKET_PATH "/var/run/wmediumd.sock"
 
 #define WSERVER_SHUTDOWN_REQUEST_TYPE 0
-#define WSERVER_UPDATE_REQUEST_TYPE 1
-#define WSERVER_UPDATE_RESPONSE_TYPE 2
+#define WSERVER_SNR_UPDATE_REQUEST_TYPE 1
+#define WSERVER_SNR_UPDATE_RESPONSE_TYPE 2
 #define WSERVER_DEL_BY_MAC_REQUEST_TYPE 3
 #define WSERVER_DEL_BY_MAC_RESPONSE_TYPE 4
 #define WSERVER_DEL_BY_ID_REQUEST_TYPE 5
 #define WSERVER_DEL_BY_ID_RESPONSE_TYPE 6
 #define WSERVER_ADD_REQUEST_TYPE 7
 #define WSERVER_ADD_RESPONSE_TYPE 8
+#define WSERVER_ERRPROB_UPDATE_REQUEST_TYPE 9
+#define WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE 10
 
 #ifndef __packed
 #define __packed __attribute__((packed))
@@ -54,6 +57,7 @@
 
 typedef uint8_t u8;
 typedef int32_t i32;
+typedef uint32_t u32;
 
 /*
  * Macro for unused parameters
@@ -78,6 +82,19 @@ typedef struct __packed {
     snr_update_request request;
     u8 update_result;
 } snr_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 from_addr[ETH_ALEN];
+    u8 to_addr[ETH_ALEN];
+    u32 errprob;
+} errprob_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    errprob_update_request request;
+    u8 update_result;
+} errprob_update_response;
 
 typedef struct __packed {
     wserver_msg base;
@@ -153,6 +170,10 @@ int send_snr_update_request(int sock, const snr_update_request *elem);
 
 int send_snr_update_response(int sock, const snr_update_response *elem);
 
+int send_errprob_update_request(int sock, const errprob_update_request *elem);
+
+int send_errprob_update_response(int sock, const errprob_update_response *elem);
+
 int send_station_del_by_mac_request(int sock, const station_del_by_mac_request *elem);
 
 int send_station_del_by_mac_response(int sock, const station_del_by_mac_response *elem);
@@ -168,6 +189,10 @@ int send_station_add_response(int sock, const station_add_response *elem);
 int recv_snr_update_request(int sock, snr_update_request *elem);
 
 int recv_snr_update_response(int sock, snr_update_response *elem);
+
+int recv_errprob_update_request(int sock, errprob_update_request *elem);
+
+int recv_errprob_update_response(int sock, errprob_update_response *elem);
 
 int recv_station_del_by_mac_request(int sock, station_del_by_mac_request *elem);
 

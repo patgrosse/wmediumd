@@ -40,11 +40,19 @@
 
 
 int send_snr_update_request(int sock, const snr_update_request *elem) {
-    align_send_msg(sock, elem, snr_update_request, WSERVER_UPDATE_REQUEST_TYPE)
+    align_send_msg(sock, elem, snr_update_request, WSERVER_SNR_UPDATE_REQUEST_TYPE)
 }
 
 int send_snr_update_response(int sock, const snr_update_response *elem) {
-    align_send_msg(sock, elem, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE)
+    align_send_msg(sock, elem, snr_update_response, WSERVER_SNR_UPDATE_RESPONSE_TYPE)
+}
+
+int send_errprob_update_request(int sock, const errprob_update_request *elem) {
+    align_send_msg(sock, elem, errprob_update_request, WSERVER_ERRPROB_UPDATE_REQUEST_TYPE)
+}
+
+int send_errprob_update_response(int sock, const errprob_update_response *elem) {
+    align_send_msg(sock, elem, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE)
 }
 
 int send_station_del_by_mac_request(int sock, const station_del_by_mac_request *elem) {
@@ -72,11 +80,19 @@ int send_station_add_response(int sock, const station_add_response *elem) {
 }
 
 int recv_snr_update_request(int sock, snr_update_request *elem) {
-    align_recv_msg(sock, elem, snr_update_request, WSERVER_UPDATE_REQUEST_TYPE)
+    align_recv_msg(sock, elem, snr_update_request, WSERVER_SNR_UPDATE_REQUEST_TYPE)
 }
 
 int recv_snr_update_response(int sock, snr_update_response *elem) {
-    align_recv_msg(sock, elem, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE)
+    align_recv_msg(sock, elem, snr_update_response, WSERVER_SNR_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_errprob_update_request(int sock, errprob_update_request *elem) {
+    align_recv_msg(sock, elem, errprob_update_request, WSERVER_ERRPROB_UPDATE_REQUEST_TYPE)
+}
+
+int recv_errprob_update_response(int sock, errprob_update_response *elem) {
+    align_recv_msg(sock, elem, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE)
 }
 
 int recv_station_del_by_mac_request(int sock, station_del_by_mac_request *elem) {
@@ -118,9 +134,9 @@ ssize_t get_msg_size_by_type(int type) {
     switch (type) {
         case WSERVER_SHUTDOWN_REQUEST_TYPE:
             return sizeof(wserver_msg);
-        case WSERVER_UPDATE_REQUEST_TYPE:
+        case WSERVER_SNR_UPDATE_REQUEST_TYPE:
             return sizeof(snr_update_request);
-        case WSERVER_UPDATE_RESPONSE_TYPE:
+        case WSERVER_SNR_UPDATE_RESPONSE_TYPE:
             return sizeof(snr_update_response);
         case WSERVER_DEL_BY_MAC_REQUEST_TYPE:
             return sizeof(station_del_by_mac_request);
@@ -134,6 +150,10 @@ ssize_t get_msg_size_by_type(int type) {
             return sizeof(station_add_request);
         case WSERVER_ADD_RESPONSE_TYPE:
             return sizeof(station_add_response);
+        case WSERVER_ERRPROB_UPDATE_REQUEST_TYPE:
+            return sizeof(errprob_update_request);
+        case WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE:
+            return sizeof(errprob_update_response);
         default:
             return -1;
     }

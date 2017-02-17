@@ -75,6 +75,13 @@ void string_to_mac_address(const char *str, u8 *addr) {
     addr[5] = (u8) a[5];
 }
 
+u32 double_errprob_to_fixed_point(double errprob) {
+    unsigned int SHIFT_AMOUNT = 31;
+    u32 beforecomma = (unsigned int) errprob;
+    u32 aftercomma = (unsigned int) ((errprob - beforecomma) * (1 << SHIFT_AMOUNT));
+    return (beforecomma << SHIFT_AMOUNT) + aftercomma;
+}
+
 int main() {
     int create_socket;
     struct sockaddr_un address;
@@ -99,24 +106,24 @@ int main() {
         receive_response(create_socket, &response, station_add_response, WSERVER_ADD_RESPONSE_TYPE);
         printf("answer was: %d\n", response.update_result);
 
-        printf("==== snr update 1\n");
-        snr_update_request request2;
+        printf("==== errprob update 1\n");
+        errprob_update_request request2;
         string_to_mac_address("02:00:00:00:01:00", request2.from_addr);
         string_to_mac_address("02:00:00:00:02:00", request2.to_addr);
-        request2.snr = 15;
-        send_request(create_socket, &request2, snr_update_request);
-        snr_update_response response2;
-        receive_response(create_socket, &response2, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE);
+        request2.errprob = double_errprob_to_fixed_point(0.7);
+        send_request(create_socket, &request2, errprob_update_request);
+        errprob_update_response response2;
+        receive_response(create_socket, &response2, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE);
         printf("answer was: %d\n", response2.update_result);
 
-        printf("==== snr update 2\n");
-        snr_update_request request3;
+        printf("==== errprob update 2\n");
+        errprob_update_request request3;
         string_to_mac_address("02:00:00:00:02:00", request3.from_addr);
         string_to_mac_address("02:00:00:00:01:00", request3.to_addr);
-        request3.snr = 15;
-        send_request(create_socket, &request3, snr_update_request);
-        snr_update_response response3;
-        receive_response(create_socket, &response3, snr_update_response, WSERVER_UPDATE_RESPONSE_TYPE);
+        request3.errprob = double_errprob_to_fixed_point(0.5);
+        send_request(create_socket, &request3, errprob_update_request);
+        errprob_update_response response3;
+        receive_response(create_socket, &response3, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE);
         printf("answer was: %d\n", response3.update_result);
 
 

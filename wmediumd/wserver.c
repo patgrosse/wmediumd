@@ -28,7 +28,6 @@
 #include <pthread.h>
 #include <errno.h>
 #include <event.h>
-#include <event2/thread.h>
 
 #include "wserver.h"
 #include "wmediumd_dynamic.h"
@@ -121,40 +120,96 @@ int accept_connection(int listen_soc) {
     return soc;
 }
 
-int handle_update_request(struct request_ctx *ctx, const snr_update_request *request) {
+int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request *request) {
     snr_update_response response;
     response.request = *request;
 
-    struct station *sender = NULL;
-    struct station *receiver = NULL;
-    struct station *station;
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        struct station *sender = NULL;
+        struct station *receiver = NULL;
+        struct station *station;
 
-    pthread_rwlock_wrlock(&snr_lock);
+        pthread_rwlock_wrlock(&snr_lock);
 
-    list_for_each_entry(station, &ctx->ctx->stations, list) {
-        if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
-            sender = station;
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+            if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
+                sender = station;
+            }
+            if (memcmp(&request->to_addr, station->addr, ETH_ALEN) == 0) {
+                receiver = station;
+            }
         }
-        if (memcmp(&request->to_addr, station->addr, ETH_ALEN) == 0) {
-            receiver = station;
-        }
-    }
 
-    if (!sender || !receiver) {
-        w_logf(ctx->ctx, LOG_WARNING,
-               LOG_PREFIX "Could not perform update from=" MAC_FMT ", to=" MAC_FMT ", snr=%d; station(s) not found\n",
-               MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr), request->snr);
-        response.update_result = WUPDATE_INTF_NOTFOUND;
+        if (!sender || !receiver) {
+            w_logf(ctx->ctx, LOG_WARNING,
+                   LOG_PREFIX "Could not perform SNR update from=" MAC_FMT ", to=" MAC_FMT ", snr=%d; station(s) not found\n",
+                   MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr), request->snr);
+            response.update_result = WUPDATE_INTF_NOTFOUND;
+        } else {
+            w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing SNR update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
+                   MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), request->snr);
+            ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
+            ctx->ctx->snr_matrix[receiver->index * ctx->ctx->num_stas + sender->index] = request->snr;
+            response.update_result = WUPDATE_SUCCESS;
+        }
+        pthread_rwlock_unlock(&snr_lock);
     } else {
-        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing update: from=" MAC_FMT ", to=" MAC_FMT ", snr=%d\n",
-               MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), request->snr);
-        ctx->ctx->snr_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = request->snr;
-        response.update_result = WUPDATE_SUCCESS;
+        response.update_result = WUPDATE_WRONG_MODE;
     }
-    pthread_rwlock_unlock(&snr_lock);
     int ret = wserver_send_msg(ctx->sock_fd, &response, snr_update_response);
     if (ret < 0) {
-        w_logf(ctx->ctx, LOG_ERR, "Error on update response: %s\n", strerror(abs(ret)));
+        w_logf(ctx->ctx, LOG_ERR, "Error on SNR update response: %s\n", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
+}
+
+int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request) {
+    errprob_update_response response;
+    response.request = *request;
+
+    if (ctx->ctx->error_prob_matrix != NULL) {
+        struct station *sender = NULL;
+        struct station *receiver = NULL;
+        struct station *station;
+
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+            if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
+                sender = station;
+            }
+            if (memcmp(&request->to_addr, station->addr, ETH_ALEN) == 0) {
+                receiver = station;
+            }
+        }
+
+        // conversion from fixed point
+        u32 SHIFT_AMOUNT = 31;
+        u32 SHIFT_MASK = 0x7fffffff; // ((1 << SHIFT_AMOUNT) - 1)
+        double errprob =
+                ((double) (request->errprob & SHIFT_MASK) / (1 << SHIFT_AMOUNT)) + (request->errprob >> SHIFT_AMOUNT);
+
+        if (!sender || !receiver) {
+            w_logf(ctx->ctx, LOG_WARNING,
+                   LOG_PREFIX "Could not perform ERRPROB update from=" MAC_FMT ", to=" MAC_FMT ", errprob=%f; station(s) not found\n",
+                   MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr), errprob);
+            response.update_result = WUPDATE_INTF_NOTFOUND;
+        } else {
+            w_logf(ctx->ctx, LOG_NOTICE,
+                   LOG_PREFIX "Performing ERRPROB update: from=" MAC_FMT ", to=" MAC_FMT ", errprob=%f\n",
+                   MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr), errprob);
+            ctx->ctx->error_prob_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = errprob;
+            ctx->ctx->error_prob_matrix[receiver->index * ctx->ctx->num_stas + sender->index] = errprob;
+            response.update_result = WUPDATE_SUCCESS;
+        }
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, errprob_update_response);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on ERRPROB update response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -261,12 +316,19 @@ int receive_handle_request(struct request_ctx *ctx) {
     }
     if (recv_type == WSERVER_SHUTDOWN_REQUEST_TYPE) {
         return WACTION_CLOSE;
-    } else if (recv_type == WSERVER_UPDATE_REQUEST_TYPE) {
+    } else if (recv_type == WSERVER_SNR_UPDATE_REQUEST_TYPE) {
         snr_update_request request;
         if ((ret = wserver_recv_msg(ctx->sock_fd, &request, snr_update_request))) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
-            return handle_update_request(ctx, &request);
+            return handle_snr_update_request(ctx, &request);
+        }
+    } else if (recv_type == WSERVER_ERRPROB_UPDATE_REQUEST_TYPE) {
+        errprob_update_request request;
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, errprob_update_request))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_errprob_update_request(ctx, &request);
         }
     } else if (recv_type == WSERVER_DEL_BY_MAC_REQUEST_TYPE) {
         station_del_by_mac_request request;
@@ -359,7 +421,6 @@ void *run_wserver(void *ctx) {
     }
     w_logf(ctx, LOG_DEBUG, LOG_PREFIX "Listening for incoming connection\n");
 
-    evthread_use_pthreads();
     evutil_make_socket_nonblocking(listen_soc);
     server_event_base = event_base_new();
     accept_event = event_new(server_event_base, listen_soc, EV_READ | EV_PERSIST, on_listen_event, ctx);
