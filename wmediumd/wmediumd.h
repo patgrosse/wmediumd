@@ -154,6 +154,7 @@ struct intf_info {
 
 void station_init_queues(struct station *station);
 bool timespec_before(struct timespec *t1, struct timespec *t2);
+int set_default_per(struct wmediumd *ctx);
 int read_per_file(struct wmediumd *ctx, const char *file_name);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
