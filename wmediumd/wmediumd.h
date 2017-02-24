@@ -106,8 +106,7 @@ struct wmediumd {
 	int fading_coefficient;
 
 	struct nl_cb *cb;
-	struct nl_cache *cache;
-	struct genl_family *family;
+	int family_id;
 
 	int (*get_link_snr)(struct wmediumd *, struct station *,
 			    struct station *);
