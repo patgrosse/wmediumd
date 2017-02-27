@@ -855,7 +855,7 @@ void print_help(int exval)
 	printf("                  LOG_LVL: RFC 5424 severity, values 0 - 7\n");
 	printf("                  >= 3: errors are logged\n");
 	printf("                  >= 5: startup msgs are logged\n");
-	printf("                  >= 6: dropped packets are logged\n");
+	printf("                  >= 6: dropped packets are logged (default)\n");
 	printf("                  == 7: all packets will be logged\n");
 	printf("  -c FILE         set input config file\n");
 	printf("  -x FILE         set input PER file\n");
@@ -889,7 +889,7 @@ int main(int argc, char *argv[])
 		print_help(EXIT_FAILURE);
 	}
 
-	ctx.log_lvl = 7;
+	ctx.log_lvl = 6;
 	unsigned long int parse_log_lvl;
 	char* parse_end_token;
 
@@ -917,7 +917,8 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			parse_log_lvl = strtoul(optarg, &parse_end_token, 10);
-			if ((parse_log_lvl == ULONG_MAX && errno == ERANGE) || optarg == parse_end_token || parse_log_lvl > 7) {
+			if ((parse_log_lvl == ULONG_MAX && errno == ERANGE) ||
+			     optarg == parse_end_token || parse_log_lvl > 7) {
 				printf("wmediumd: Error - Invalid RFC 5424 severity level: "
 							   "%s\n\n", optarg);
 				print_help(EXIT_FAILURE);
