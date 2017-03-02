@@ -1,4 +1,4 @@
-VERSION_STR="\"0.2\""
+VERSION_STR="\"0.3\""
 
 # Look for libnl libraries
 PKG_CONFIG ?= pkg-config
