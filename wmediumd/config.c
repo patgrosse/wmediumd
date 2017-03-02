@@ -418,17 +418,14 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 			"per_file and error_probs could not be used at the same time\n");
 		goto fail;
 	}
-	if (!per_file && !error_probs) {
-		w_flogf(ctx, LOG_ERR, stderr,
-			"Specify packet error rate file(default is tests/signal_table_ieee80211ax) or error_probs.\n");
-		goto fail;
-	}
 
 	ctx->get_link_snr = get_link_snr_from_snr_matrix;
 
 	ctx->per_matrix = NULL;
 	ctx->per_matrix_row_num = 0;
 	if (per_file && read_per_file(ctx, per_file))
+		goto fail;
+	if (!per_file && !error_probs && set_default_per(ctx))
 		goto fail;
 
 	ctx->error_prob_matrix = NULL;

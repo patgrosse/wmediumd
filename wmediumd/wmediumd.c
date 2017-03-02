@@ -445,9 +445,8 @@ static int send_tx_info_frame_nl(struct wmediumd *ctx, struct frame *frame)
 		return -1;
 	}
 
-	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ,
-			genl_family_get_id(ctx->family), 0,
-			NLM_F_REQUEST, HWSIM_CMD_TX_INFO_FRAME,
+	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, ctx->family_id,
+			0, NLM_F_REQUEST, HWSIM_CMD_TX_INFO_FRAME,
 			VERSION_NR) == NULL) {
 		w_logf(ctx, LOG_ERR, "%s: genlmsg_put failed\n", __func__);
 		ret = -1;
@@ -496,9 +495,8 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 		return -1;
 	}
 
-	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ,
-			genl_family_get_id(ctx->family), 0,
-			NLM_F_REQUEST, HWSIM_CMD_FRAME,
+	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, ctx->family_id,
+			0, NLM_F_REQUEST, HWSIM_CMD_FRAME,
 			VERSION_NR) == NULL) {
 		w_logf(ctx, LOG_ERR, "%s: genlmsg_put failed\n", __func__);
 		ret = -1;
@@ -764,9 +762,8 @@ int send_register_msg(struct wmediumd *ctx)
 		return -1;
 	}
 
-	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ,
-			genl_family_get_id(ctx->family), 0,
-			NLM_F_REQUEST, HWSIM_CMD_REGISTER,
+	if (genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, ctx->family_id,
+			0, NLM_F_REQUEST, HWSIM_CMD_REGISTER,
 			VERSION_NR) == NULL) {
 		w_logf(ctx, LOG_ERR, "%s: genlmsg_put failed\n", __func__);
 		ret = -1;
@@ -821,15 +818,8 @@ static int init_netlink(struct wmediumd *ctx)
 		return -1;
 	}
 
-	ret = genl_ctrl_alloc_cache(sock, &ctx->cache);
-	if (ret < 0) {
-		w_logf(ctx, LOG_ERR, "Error allocationg netlink cache ret=%d\n", ret);
-		return -1;
-	}
-
-	ctx->family = genl_ctrl_search_by_name(ctx->cache, "MAC80211_HWSIM");
-
-	if (!ctx->family) {
+	ctx->family_id = genl_ctrl_resolve(sock, "MAC80211_HWSIM");
+	if (ctx->family_id < 0) {
 		w_logf(ctx, LOG_ERR, "Family MAC80211_HWSIM not registered\n");
 		return -1;
 	}
@@ -977,8 +967,6 @@ int main(int argc, char *argv[])
 
 	free(ctx.sock);
 	free(ctx.cb);
-	free(ctx.cache);
-	free(ctx.family);
 	free(ctx.intf);
 	free(ctx.per_matrix);
 
