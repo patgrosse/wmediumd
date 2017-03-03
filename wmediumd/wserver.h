@@ -46,12 +46,34 @@ void stop_wserver();
  * @param ctx The request_ctx context
  * @param request The received request
  */
-int handle_update_request(struct request_ctx *ctx, const snr_update_request *request);
+int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request *request);
 
+/**
+ * Handle a errprob_update_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
+int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request);
+
+/**
+ * Handle a station_del_by_id_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
 int handle_delete_by_id_request(struct request_ctx *ctx, station_del_by_id_request *request);
 
+/**
+ * Handle a station_del_by_mac_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
 int handle_delete_by_mac_request(struct request_ctx *ctx, station_del_by_mac_request *request);
 
+/**
+ * Handle a station_add_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
 int handle_add_request(struct request_ctx *ctx, station_add_request *request);
 
 #endif //WMEDIUMD_SERVER_H
