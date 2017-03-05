@@ -856,6 +856,8 @@ void print_help(int exval)
 	printf("  -c FILE         set input config file\n");
 	printf("  -x FILE         set input PER file\n");
 	printf("  -s              start the server on a socket\n");
+	printf("  -d              use the dynamic complex mode\n");
+	printf("                  (server only with matrices for each connection)\n");
 
 	exit(exval);
 }
@@ -891,8 +893,9 @@ int main(int argc, char *argv[])
 	unsigned long int parse_log_lvl;
 	char* parse_end_token;
 	bool start_server = false;
+	bool full_dynamic = false;
 
-	while ((opt = getopt(argc, argv, "hVc:l:x:s")) != -1) {
+	while ((opt = getopt(argc, argv, "hVc:l:x:sd")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help(EXIT_SUCCESS);
@@ -924,6 +927,9 @@ int main(int argc, char *argv[])
 			}
 			ctx.log_lvl = parse_log_lvl;
 			break;
+		case 'd':
+			full_dynamic = true;
+			break;
 		case 's':
 			start_server = true;
 			break;
@@ -939,15 +945,29 @@ int main(int argc, char *argv[])
 	if (optind < argc)
 		print_help(EXIT_FAILURE);
 
-	if (!config_file) {
-		printf("%s: config file must be supplied\n", argv[0]);
-		print_help(EXIT_FAILURE);
+	if (full_dynamic) {
+		if (config_file) {
+			printf("%s: cannot use dynamic complex mode with config file\n", argv[0]);
+			print_help(EXIT_FAILURE);
+		}
+
+		if (!start_server) {
+			printf("%s: dynamic complex mode requires the server option\n", argv[0]);
+			print_help(EXIT_FAILURE);
+		}
+
+		w_logf(&ctx, LOG_NOTICE, "Using dynamic complex mode instead of config file\n");
+	} else {
+		if (!config_file) {
+			printf("%s: config file must be supplied\n", argv[0]);
+			print_help(EXIT_FAILURE);
+		}
+
+		w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
 	}
 
-	w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
-
 	INIT_LIST_HEAD(&ctx.stations);
-	if (load_config(&ctx, config_file, per_file))
+	if (load_config(&ctx, config_file, per_file, full_dynamic))
 		return EXIT_FAILURE;
 
 	/* init libevent */

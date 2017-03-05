@@ -21,6 +21,9 @@
 #ifndef WMEDIUMD_WMEDIUMD_DYNAMIC_H
 #define WMEDIUMD_WMEDIUMD_DYNAMIC_H
 
+#define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
+#define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
+
 #include <stdint.h>
 #include <pthread.h>
 #include "wmediumd.h"

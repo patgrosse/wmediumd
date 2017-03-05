@@ -50,6 +50,11 @@
 #define WSERVER_ADD_RESPONSE_TYPE 8
 #define WSERVER_ERRPROB_UPDATE_REQUEST_TYPE 9
 #define WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE 10
+#define WSERVER_SPECPROB_UPDATE_REQUEST_TYPE 11
+#define WSERVER_SPECPROB_UPDATE_RESPONSE_TYPE 12
+
+#define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
+#define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
 
 #ifndef __packed
 #define __packed __attribute__((packed))
@@ -95,6 +100,20 @@ typedef struct __packed {
     errprob_update_request request;
     u8 update_result;
 } errprob_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 from_addr[ETH_ALEN];
+    u8 to_addr[ETH_ALEN];
+    u32 errprob[SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX];
+} specprob_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 from_addr[ETH_ALEN];
+    u8 to_addr[ETH_ALEN];
+    u8 update_result;
+} specprob_update_response;
 
 typedef struct __packed {
     wserver_msg base;
@@ -174,6 +193,10 @@ int send_errprob_update_request(int sock, const errprob_update_request *elem);
 
 int send_errprob_update_response(int sock, const errprob_update_response *elem);
 
+int send_specprob_update_request(int sock, const specprob_update_request *elem);
+
+int send_specprob_update_response(int sock, const specprob_update_response *elem);
+
 int send_station_del_by_mac_request(int sock, const station_del_by_mac_request *elem);
 
 int send_station_del_by_mac_response(int sock, const station_del_by_mac_response *elem);
@@ -194,6 +217,10 @@ int recv_errprob_update_request(int sock, errprob_update_request *elem);
 
 int recv_errprob_update_response(int sock, errprob_update_response *elem);
 
+int recv_specprob_update_request(int sock, specprob_update_request *elem);
+
+int recv_specprob_update_response(int sock, specprob_update_response *elem);
+
 int recv_station_del_by_mac_request(int sock, station_del_by_mac_request *elem);
 
 int recv_station_del_by_mac_response(int sock, station_del_by_mac_response *elem);
@@ -205,5 +232,9 @@ int recv_station_del_by_id_response(int sock, station_del_by_id_response *elem);
 int recv_station_add_request(int sock, station_add_request *elem);
 
 int recv_station_add_response(int sock, station_add_response *elem);
+
+double custom_fixed_point_to_floating_point(u32 fixed_point);
+
+u32 custom_floating_point_to_fixed_point(double floating_point);
 
 #endif //WMEDIUMD_WSERVER_MESSAGES_H

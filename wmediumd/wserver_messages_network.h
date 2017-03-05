@@ -71,6 +71,10 @@ void hton_errprob_update_request(errprob_update_request *elem);
 
 void hton_errprob_update_response(errprob_update_response *elem);
 
+void hton_specprob_update_request(specprob_update_request *elem);
+
+void hton_specprob_update_response(specprob_update_response *elem);
+
 void hton_station_del_by_mac_request(station_del_by_mac_request *elem);
 
 void hton_station_del_by_mac_response(station_del_by_mac_response *elem);
@@ -92,6 +96,10 @@ void ntoh_snr_update_response(snr_update_response *elem);
 void ntoh_errprob_update_request(errprob_update_request *elem);
 
 void ntoh_errprob_update_response(errprob_update_response *elem);
+
+void ntoh_specprob_update_request(specprob_update_request *elem);
+
+void ntoh_specprob_update_response(specprob_update_response *elem);
 
 void ntoh_station_del_by_mac_request(station_del_by_mac_request *elem);
 

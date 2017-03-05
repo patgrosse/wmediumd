@@ -31,6 +31,7 @@
 
 #include "wserver.h"
 #include "wmediumd_dynamic.h"
+#include "wserver_messages.h"
 
 
 #define LOG_PREFIX "W_SRV: "
@@ -184,11 +185,7 @@ int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_
             }
         }
 
-        // conversion from fixed point
-        u32 SHIFT_AMOUNT = 31;
-        u32 SHIFT_MASK = 0x7fffffff; // ((1 << SHIFT_AMOUNT) - 1)
-        double errprob =
-                ((double) (request->errprob & SHIFT_MASK) / (1 << SHIFT_AMOUNT)) + (request->errprob >> SHIFT_AMOUNT);
+        double errprob = custom_fixed_point_to_floating_point(request->errprob);
 
         if (!sender || !receiver) {
             w_logf(ctx->ctx, LOG_WARNING,
@@ -210,6 +207,58 @@ int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_
     int ret = wserver_send_msg(ctx->sock_fd, &response, errprob_update_response);
     if (ret < 0) {
         w_logf(ctx->ctx, LOG_ERR, "Error on ERRPROB update response: %s\n", strerror(abs(ret)));
+        return WACTION_ERROR;
+    }
+    return ret;
+}
+
+int handle_specprob_update_request(struct request_ctx *ctx, const specprob_update_request *request) {
+    specprob_update_response response;
+    memcpy(response.from_addr, request->from_addr, ETH_ALEN);
+    memcpy(response.to_addr, request->to_addr, ETH_ALEN);
+
+    if (ctx->ctx->station_err_matrix != NULL) {
+        struct station *sender = NULL;
+        struct station *receiver = NULL;
+        struct station *station;
+
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+            if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
+                sender = station;
+            }
+            if (memcmp(&request->to_addr, station->addr, ETH_ALEN) == 0) {
+                receiver = station;
+            }
+        }
+
+        if (!sender || !receiver) {
+            w_logf(ctx->ctx, LOG_WARNING,
+                   LOG_PREFIX "Could not perform SPECPROB update from=" MAC_FMT ", to=" MAC_FMT "; station(s) not found\n",
+                   MAC_ARGS(request->from_addr), MAC_ARGS(request->to_addr));
+            response.update_result = WUPDATE_INTF_NOTFOUND;
+        } else {
+            w_logf(ctx->ctx, LOG_NOTICE,
+                   LOG_PREFIX "Performing SPECPROB update: from=" MAC_FMT ", to=" MAC_FMT "\n",
+                   MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr));
+            double *specific_mat = malloc(sizeof(double) * SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX);
+            for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
+                specific_mat[i] = custom_fixed_point_to_floating_point(request->errprob[i]);
+            }
+            if (ctx->ctx->station_err_matrix[sender->index * ctx->ctx->num_stas + receiver->index] != NULL) {
+                free(ctx->ctx->station_err_matrix[sender->index * ctx->ctx->num_stas + receiver->index]);
+            }
+            ctx->ctx->station_err_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = specific_mat;
+            response.update_result = WUPDATE_SUCCESS;
+        }
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, specprob_update_response);
+    if (ret < 0) {
+        w_logf(ctx->ctx, LOG_ERR, "Error on SPECPROB update response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
     return ret;
@@ -329,6 +378,13 @@ int receive_handle_request(struct request_ctx *ctx) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_errprob_update_request(ctx, &request);
+        }
+    } else if (recv_type == WSERVER_SPECPROB_UPDATE_REQUEST_TYPE) {
+        specprob_update_request request;
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, specprob_update_request))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_specprob_update_request(ctx, &request);
         }
     } else if (recv_type == WSERVER_DEL_BY_MAC_REQUEST_TYPE) {
         station_del_by_mac_request request;

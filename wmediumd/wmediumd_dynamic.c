@@ -25,6 +25,7 @@
 
 #define DEFAULT_DYNAMIC_SNR -10
 #define DEFAULT_DYNAMIC_ERRPROB 1.0
+#define DEFAULT_FULL_DYNAMIC_ERRPROB 1.0
 
 pthread_rwlock_t snr_lock = PTHREAD_RWLOCK_INITIALIZER;
 
@@ -49,46 +50,64 @@ int add_station(struct wmediumd *ctx, const u8 addr[]) {
     union {
         int *old_snr_matrix;
         double *old_errprob_matrix;
+        double **old_station_err_matrix;
     } matrizes;
     int ret;
-    if (ctx->error_prob_matrix == NULL) {
-        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
-    } else {
+    if (ctx->station_err_matrix != NULL) {
+        swap_matrix(ctx->station_err_matrix, oldnum, newnum, double*, matrizes.old_station_err_matrix);
+    } else if (ctx->error_prob_matrix != NULL) {
         swap_matrix(ctx->error_prob_matrix, oldnum, newnum, double, matrizes.old_errprob_matrix);
+    } else {
+        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
     }
 
     // Copy old matrix
     for (size_t x = 0; x < oldnum; x++) {
         for (size_t y = 0; y < oldnum; y++) {
-            if (ctx->error_prob_matrix == NULL) {
-                ctx->snr_matrix[x * newnum + y] = matrizes.old_snr_matrix[x * oldnum + y];
-            } else {
+            if (ctx->station_err_matrix != NULL) {
+                ctx->station_err_matrix[x * newnum + y] = matrizes.old_station_err_matrix[x * oldnum + y];
+            } else if (ctx->error_prob_matrix != NULL) {
                 ctx->error_prob_matrix[x * newnum + y] = matrizes.old_errprob_matrix[x * oldnum + y];
+            } else {
+                ctx->snr_matrix[x * newnum + y] = matrizes.old_snr_matrix[x * oldnum + y];
             }
         }
     }
 
     // Fill last lines with default snr
     for (size_t x = 0; x < newnum; x++) {
-        if (ctx->error_prob_matrix == NULL) {
-            ctx->snr_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_SNR;
-        } else {
+        if (ctx->station_err_matrix != NULL) {
+            ctx->station_err_matrix[x * newnum + oldnum] = malloc(
+                    SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX * sizeof(double));
+            for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
+                ctx->station_err_matrix[x * newnum + oldnum][i] = DEFAULT_FULL_DYNAMIC_ERRPROB;
+            }
+        } else if (ctx->error_prob_matrix != NULL) {
             ctx->error_prob_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_ERRPROB;
+        } else {
+            ctx->snr_matrix[x * newnum + oldnum] = DEFAULT_DYNAMIC_SNR;
         }
     }
     for (size_t y = 0; y < newnum; y++) {
-        if (ctx->error_prob_matrix == NULL) {
-            ctx->snr_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_SNR;
-        } else {
+        if (ctx->station_err_matrix != NULL) {
+            ctx->station_err_matrix[oldnum * newnum + y] = malloc(
+                    SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX * sizeof(double));
+            for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
+                ctx->station_err_matrix[oldnum * newnum + y][i] = DEFAULT_FULL_DYNAMIC_ERRPROB;
+            }
+        } else if (ctx->error_prob_matrix != NULL) {
             ctx->error_prob_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_ERRPROB;
+        } else {
+            ctx->snr_matrix[oldnum * newnum + y] = DEFAULT_DYNAMIC_SNR;
         }
     }
 
-
-    if (ctx->error_prob_matrix == NULL) {
-        free(matrizes.old_snr_matrix);
-    } else {
+    if (ctx->station_err_matrix != NULL) {
+        free(matrizes.old_station_err_matrix);
+    } else if (ctx->error_prob_matrix != NULL) {
         free(matrizes.old_errprob_matrix);
+    } else {
+        free(matrizes.old_snr_matrix);
     }
 
     // Init new station object
@@ -122,11 +141,14 @@ int del_station(struct wmediumd *ctx, struct station *station) {
     union {
         int *old_snr_matrix;
         double *old_errprob_matrix;
+        double **old_station_err_matrix;
     } matrizes;
-    if (ctx->error_prob_matrix == NULL) {
-        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
-    } else {
+    if (ctx->station_err_matrix != NULL) {
+        swap_matrix(ctx->station_err_matrix, oldnum, newnum, double*, matrizes.old_station_err_matrix);
+    } else if (ctx->error_prob_matrix != NULL) {
         swap_matrix(ctx->error_prob_matrix, oldnum, newnum, double, matrizes.old_errprob_matrix);
+    } else {
+        swap_matrix(ctx->snr_matrix, oldnum, newnum, int, matrizes.old_snr_matrix);
     }
 
     size_t index = (size_t) station->index;
@@ -135,6 +157,23 @@ int del_station(struct wmediumd *ctx, struct station *station) {
     struct station *sta_loop = station;
     list_for_each_entry_from(sta_loop, &ctx->stations, list) {
         sta_loop->index = sta_loop->index - 1;
+    }
+
+    for (size_t x = 0; x < oldnum; x++) {
+        // free old specific matrices
+        if (matrizes.old_station_err_matrix[x * oldnum + index] != NULL) {
+            free(matrizes.old_station_err_matrix[x * oldnum + index]);
+        }
+    }
+    
+    for (size_t y = 0; y < oldnum; y++) {
+        if(y == index){
+            continue;
+        }
+        // free old specific matrices
+        if (matrizes.old_station_err_matrix[index * oldnum + y] != NULL) {
+            free(matrizes.old_station_err_matrix[index * oldnum + y]);
+        }
     }
 
     // Copy all values not related to deleted station
@@ -148,19 +187,24 @@ int del_station(struct wmediumd *ctx, struct station *station) {
             if (y == index) {
                 continue;
             }
-            if (ctx->error_prob_matrix == NULL) {
-                ctx->snr_matrix[xnew * newnum + ynew] = matrizes.old_snr_matrix[x * oldnum + y];
-            } else {
+            if (ctx->station_err_matrix != NULL) {
+                ctx->station_err_matrix[xnew * newnum + ynew] = matrizes.old_station_err_matrix[x * oldnum + y];
+            } else if (ctx->error_prob_matrix != NULL) {
                 ctx->error_prob_matrix[xnew * newnum + ynew] = matrizes.old_errprob_matrix[x * oldnum + y];
+            } else {
+                ctx->snr_matrix[xnew * newnum + ynew] = matrizes.old_snr_matrix[x * oldnum + y];
             }
             ynew++;
         }
         xnew++;
     }
-    if (ctx->error_prob_matrix == NULL) {
-        free(matrizes.old_snr_matrix);
-    } else {
+
+    if (ctx->station_err_matrix != NULL) {
+        free(matrizes.old_station_err_matrix);
+    } else if (ctx->error_prob_matrix != NULL) {
         free(matrizes.old_errprob_matrix);
+    } else {
+        free(matrizes.old_snr_matrix);
     }
 
     list_del(&station->list);

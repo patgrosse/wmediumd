@@ -103,6 +103,17 @@ void hton_errprob_update_response(errprob_update_response *elem) {
     hton_errprob_update_request(&elem->request);
 }
 
+void hton_specprob_update_request(specprob_update_request *elem) {
+    hton_base(&elem->base);
+    for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
+        htonu_wrapper(&elem->errprob[i]);
+    }
+}
+
+void hton_specprob_update_response(specprob_update_response *elem) {
+    hton_base(&elem->base);
+}
+
 void hton_station_del_by_mac_request(station_del_by_mac_request *elem) {
     hton_base(&elem->base);
 }
@@ -154,6 +165,17 @@ void ntoh_errprob_update_request(errprob_update_request *elem) {
 void ntoh_errprob_update_response(errprob_update_response *elem) {
     ntoh_base(&elem->base);
     ntoh_errprob_update_request(&elem->request);
+}
+
+void ntoh_specprob_update_request(specprob_update_request *elem) {
+    ntoh_base(&elem->base);
+    for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
+        ntohu_wrapper(&elem->errprob[i]);
+    }
+}
+
+void ntoh_specprob_update_response(specprob_update_response *elem) {
+    ntoh_base(&elem->base);
 }
 
 void ntoh_station_del_by_mac_request(station_del_by_mac_request *elem) {

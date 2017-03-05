@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 #include "wmediumd.h"
 
@@ -40,6 +41,30 @@ struct rate rateset[] = {
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 #define PER_MATRIX_RATE_LEN (12)
+#define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
+#define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
+
+double get_error_prob_from_specific_matrix(struct wmediumd *ctx, double snr,
+												  unsigned int rate_idx,
+												  int frame_len, struct station *src,
+												  struct station *dst)
+{
+	if (dst == NULL) // dst is multicast. returned value will not be used.
+		return 0.0;
+	int size_idx = log2(frame_len);
+	if (size_idx < 0) {
+		size_idx = 0;
+	} else if (size_idx >= SPECIFIC_MATRIX_MAX_SIZE_IDX) {
+		size_idx = SPECIFIC_MATRIX_MAX_SIZE_IDX - 1;
+	}
+	if (rate_idx >= SPECIFIC_MATRIX_MAX_RATE_IDX) {
+		w_flogf(ctx, LOG_ERR, stderr,
+				"%s: invalid rate_idx=%d\n", __func__, rate_idx);
+		exit(EXIT_FAILURE);
+	}
+	double *specific_matrix = ctx->station_err_matrix[src->index * ctx->num_stas + dst->index];
+	return specific_matrix[size_idx * SPECIFIC_MATRIX_MAX_RATE_IDX + rate_idx];
+}
 
 double n_choose_k(double n, double k)
 {

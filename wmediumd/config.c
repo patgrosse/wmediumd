@@ -297,7 +297,7 @@ static int get_no_fading_signal(struct wmediumd *ctx)
 /*
  *	Loads a config file into memory
  */
-int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
+int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bool full_dynamic)
 {
 	config_t cfg, *cf;
 	const config_setting_t *ids, *links, *model_type;
@@ -309,6 +309,24 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	struct station *station;
 	const char *model_type_str;
 	float default_prob_value = 0.0;
+
+	if (full_dynamic) {
+		ctx->sta_array = malloc(0);
+		ctx->num_stas = 0;
+		ctx->intf = NULL;
+		ctx->get_fading_signal = get_no_fading_signal;
+		ctx->fading_coefficient = 0;
+		ctx->move_stations = move_stations_donothing;
+		ctx->snr_matrix = malloc(0);
+		ctx->per_matrix = NULL;
+		ctx->per_matrix_row_num = 0;
+		ctx->error_prob_matrix = NULL;
+		ctx->get_link_snr = get_link_snr_default;
+		ctx->get_error_prob = get_error_prob_from_specific_matrix;
+		ctx->station_err_matrix = malloc(0);
+		return 0;
+	}
+	ctx->station_err_matrix = NULL;
 
 	/*initialize the config file*/
 	cf = &cfg;

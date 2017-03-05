@@ -26,7 +26,7 @@
 
 #define align_send_msg(sock_fd, elem, type, typeint) \
     type tosend; \
-    *((int *) elem) = typeint; \
+    *((u8 *) elem) = typeint; \
     memcpy(&tosend, elem, sizeof(type)); \
     hton_type(&tosend, type);\
     return sendfull(sock_fd, &tosend, sizeof(type), 0, MSG_NOSIGNAL);
@@ -53,6 +53,14 @@ int send_errprob_update_request(int sock, const errprob_update_request *elem) {
 
 int send_errprob_update_response(int sock, const errprob_update_response *elem) {
     align_send_msg(sock, elem, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE)
+}
+
+int send_specprob_update_request(int sock, const specprob_update_request *elem) {
+    align_send_msg(sock, elem, specprob_update_request, WSERVER_SPECPROB_UPDATE_REQUEST_TYPE)
+}
+
+int send_specprob_update_response(int sock, const specprob_update_response *elem) {
+    align_send_msg(sock, elem, specprob_update_response, WSERVER_SPECPROB_UPDATE_RESPONSE_TYPE)
 }
 
 int send_station_del_by_mac_request(int sock, const station_del_by_mac_request *elem) {
@@ -93,6 +101,14 @@ int recv_errprob_update_request(int sock, errprob_update_request *elem) {
 
 int recv_errprob_update_response(int sock, errprob_update_response *elem) {
     align_recv_msg(sock, elem, errprob_update_response, WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_specprob_update_request(int sock, specprob_update_request *elem) {
+    align_recv_msg(sock, elem, specprob_update_request, WSERVER_SPECPROB_UPDATE_REQUEST_TYPE)
+}
+
+int recv_specprob_update_response(int sock, specprob_update_response *elem) {
+    align_recv_msg(sock, elem, specprob_update_response, WSERVER_SPECPROB_UPDATE_RESPONSE_TYPE)
 }
 
 int recv_station_del_by_mac_request(int sock, station_del_by_mac_request *elem) {
@@ -157,4 +173,17 @@ ssize_t get_msg_size_by_type(int type) {
         default:
             return -1;
     }
+}
+
+double custom_fixed_point_to_floating_point(u32 fixed_point) {
+    u32 SHIFT_AMOUNT = 31;
+    u32 SHIFT_MASK = 0x7fffffff; // ((1 << SHIFT_AMOUNT) - 1)
+    return ((double) (fixed_point & SHIFT_MASK) / (1 << SHIFT_AMOUNT)) + (fixed_point >> SHIFT_AMOUNT);
+}
+
+u32 custom_floating_point_to_fixed_point(double floating_point) {
+    unsigned int SHIFT_AMOUNT = 31;
+    u32 beforecomma = (unsigned int) floating_point;
+    u32 aftercomma = (unsigned int) ((floating_point - beforecomma) * (1 << SHIFT_AMOUNT));
+    return (beforecomma << SHIFT_AMOUNT) + aftercomma;
 }

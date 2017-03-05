@@ -56,6 +56,13 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
 int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request);
 
 /**
+ * Handle a specprob_update_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
+int handle_specprob_update_request(struct request_ctx *ctx, const specprob_update_request *request);
+
+/**
  * Handle a station_del_by_id_request and pass it to wmediumd
  * @param ctx The request_ctx context
  * @param request The received request
