@@ -38,8 +38,8 @@ model :
 	type = "path_loss";
 	positions = (
 		(-50.0,   0.0),
-		(  0.0,  70.0),
-		(  0.0,-100.0),
+		(  0.0,  40.0),
+		(  0.0, -70.0),
 		( 50.0,   0.0)
 	);
 	directions = (
@@ -104,7 +104,7 @@ win=$session:$((winct+1)).0
 winct=$((winct+1))
 tmux new-window -a -t $session -n wmediumd
 
-tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg -x signal_table_ieee80211ax' C-m
+tmux send-keys -t $win '../wmediumd/wmediumd -c diamond.cfg' C-m
 
 # enable monitor
 tmux send-keys -t $session:0 'ip link set hwsim0 up' C-m

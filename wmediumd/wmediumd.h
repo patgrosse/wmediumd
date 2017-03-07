@@ -152,6 +152,8 @@ struct intf_info {
 };
 
 void station_init_queues(struct station *station);
+double get_error_prob_from_snr(double snr, unsigned int rate_idx,
+			       int frame_len);
 bool timespec_before(struct timespec *t1, struct timespec *t2);
 int set_default_per(struct wmediumd *ctx);
 int read_per_file(struct wmediumd *ctx, const char *file_name);
