@@ -433,7 +433,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file)
 	ctx->per_matrix_row_num = 0;
 	if (per_file && read_per_file(ctx, per_file))
 		goto fail;
-	if (!per_file && !error_probs && set_default_per(ctx))
+	if (!per_file && !error_probs)
 		goto fail;
 
 	ctx->error_prob_matrix = NULL;
