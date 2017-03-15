@@ -253,3 +253,11 @@ int read_per_file(struct wmediumd *ctx, const char *file_name)
 
 	return EXIT_SUCCESS;
 }
+
+int index_to_rate(size_t index)
+{
+	if (index >= ARRAY_SIZE(rateset))
+		index = ARRAY_SIZE(rateset) - 1;
+
+	return rateset[index].mbps * 10;
+}

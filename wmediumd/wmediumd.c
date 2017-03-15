@@ -38,10 +38,6 @@
 #include "ieee80211.h"
 #include "config.h"
 
-static int index_to_rate[] = {
-	60, 90, 120, 180, 240, 360, 480, 540
-};
-
 static inline int div_round(int a, int b)
 {
 	return (a + b - 1) / b;
@@ -318,7 +314,7 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	int ack_time_usec = pkt_duration(14, index_to_rate[0]) + sifs;
+	int ack_time_usec = pkt_duration(14, index_to_rate(0)) + sifs;
 
 	/*
 	 * To determine a frame's expiration time, we compute the
@@ -367,10 +363,8 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 						 frame->data_len, station,
 						 deststa);
 		for (j = 0; j < frame->tx_rates[i].count; j++) {
-			int rate = index_to_rate[rate_idx];
-			if (rate == 0) // avoid division by zero
-				continue;
-			send_time += difs + pkt_duration(frame->data_len, rate);
+			send_time += difs + pkt_duration(frame->data_len,
+				index_to_rate(rate_idx));
 
 			retries++;
 
