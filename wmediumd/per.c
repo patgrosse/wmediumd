@@ -187,11 +187,8 @@ static double get_error_prob_from_per_matrix(struct wmediumd *ctx, double snr,
 	if (signal_idx >= ctx->per_matrix_row_num)
 		return 0.0;
 
-	if (rate_idx >= PER_MATRIX_RATE_LEN) {
-		w_flogf(ctx, LOG_ERR, stderr,
-			"%s: invalid rate_idx=%d\n", __func__, rate_idx);
-		exit(EXIT_FAILURE);
-	}
+	if (rate_idx >= PER_MATRIX_RATE_LEN)
+		return 1.0;
 
 	return ctx->per_matrix[signal_idx * PER_MATRIX_RATE_LEN + rate_idx];
 }
