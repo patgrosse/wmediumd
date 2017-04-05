@@ -159,20 +159,22 @@ int del_station(struct wmediumd *ctx, struct station *station) {
         sta_loop->index = sta_loop->index - 1;
     }
 
-    for (size_t x = 0; x < oldnum; x++) {
-        // free old specific matrices
-        if (matrizes.old_station_err_matrix[x * oldnum + index] != NULL) {
-            free(matrizes.old_station_err_matrix[x * oldnum + index]);
+    if (ctx->station_err_matrix != NULL) {
+        for (size_t x = 0; x < oldnum; x++) {
+            // free old specific matrices
+            if (matrizes.old_station_err_matrix[x * oldnum + index] != NULL) {
+                free(matrizes.old_station_err_matrix[x * oldnum + index]);
+            }
         }
-    }
-    
-    for (size_t y = 0; y < oldnum; y++) {
-        if(y == index){
-            continue;
-        }
-        // free old specific matrices
-        if (matrizes.old_station_err_matrix[index * oldnum + y] != NULL) {
-            free(matrizes.old_station_err_matrix[index * oldnum + y]);
+
+        for (size_t y = 0; y < oldnum; y++) {
+            if(y == index){
+                continue;
+            }
+            // free old specific matrices
+            if (matrizes.old_station_err_matrix[index * oldnum + y] != NULL) {
+                free(matrizes.old_station_err_matrix[index * oldnum + y]);
+            }
         }
     }
 
