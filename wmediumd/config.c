@@ -78,7 +78,7 @@ static double get_error_prob_from_matrix(struct wmediumd *ctx, double snr,
 
 int use_fixed_random_value(struct wmediumd *ctx)
 {
-	return ctx->error_prob_matrix != NULL;
+	return ctx->error_prob_matrix != NULL || ctx->station_err_matrix != NULL;
 }
 
 #define FREQ_1CH (2.412e9)		// [Hz]
