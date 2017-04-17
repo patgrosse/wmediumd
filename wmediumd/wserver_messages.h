@@ -52,6 +52,8 @@
 #define WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE 10
 #define WSERVER_SPECPROB_UPDATE_REQUEST_TYPE 11
 #define WSERVER_SPECPROB_UPDATE_RESPONSE_TYPE 12
+#define WSERVER_POSITION_UPDATE_REQUEST_TYPE 13
+#define WSERVER_POSITION_UPDATE_RESPONSE_TYPE 14
 
 #define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
 #define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
@@ -62,6 +64,7 @@
 
 typedef uint8_t u8;
 typedef int32_t i32;
+typedef float f32;
 typedef uint32_t u32;
 
 /*
@@ -87,6 +90,19 @@ typedef struct __packed {
     snr_update_request request;
     u8 update_result;
 } snr_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    f32 posX;
+    f32 posY;
+} position_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    position_update_request request;
+    u8 update_result;
+} position_update_response;
 
 typedef struct __packed {
     wserver_msg base;
@@ -189,6 +205,10 @@ int send_snr_update_request(int sock, const snr_update_request *elem);
 
 int send_snr_update_response(int sock, const snr_update_response *elem);
 
+int send_position_update_request(int sock, const position_update_request *elem);
+
+int send_position_update_response(int sock, const position_update_response *elem);
+
 int send_errprob_update_request(int sock, const errprob_update_request *elem);
 
 int send_errprob_update_response(int sock, const errprob_update_response *elem);
@@ -212,6 +232,10 @@ int send_station_add_response(int sock, const station_add_response *elem);
 int recv_snr_update_request(int sock, snr_update_request *elem);
 
 int recv_snr_update_response(int sock, snr_update_response *elem);
+
+int recv_position_update_request(int sock, position_update_request *elem);
+
+int recv_position_update_response(int sock, position_update_response *elem);
 
 int recv_errprob_update_request(int sock, errprob_update_request *elem);
 
