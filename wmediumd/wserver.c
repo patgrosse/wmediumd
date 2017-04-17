@@ -125,7 +125,7 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
     snr_update_response response;
     response.request = *request;
 
-    if (ctx->ctx->snr_matrix != NULL) {
+    if (ctx->ctx->error_prob_matrix == NULL) {
         struct station *sender = NULL;
         struct station *receiver = NULL;
         struct station *station;
@@ -162,6 +162,48 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
         w_logf(ctx->ctx, LOG_ERR, "Error on SNR update response: %s\n", strerror(abs(ret)));
         return WACTION_ERROR;
     }
+    return ret;
+}
+
+int handle_position_update_request(struct request_ctx *ctx, const position_update_request *request) {
+    position_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->x = request->posX;
+				sender->y = request->posY;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Position update: for=" MAC_FMT ", position=%f,%f\n",
+			   MAC_ARGS(request->sta_addr), request->posX, request->posY);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
+					ctx->ctx->sta_array[start]->tx_power - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, position_update_response);
     return ret;
 }
 
@@ -406,6 +448,13 @@ int receive_handle_request(struct request_ctx *ctx) {
             return parse_recv_msg_rest_error(ctx->ctx, ret);
         } else {
             return handle_add_request(ctx, &request);
+        }
+    } else if (recv_type == WSERVER_POSITION_UPDATE_REQUEST_TYPE) {
+        position_update_request request;
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, position_update_request))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_position_update_request(ctx, &request);
         }
     } else {
         return -1;
