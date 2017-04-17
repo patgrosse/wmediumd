@@ -78,7 +78,7 @@ static double get_error_prob_from_matrix(struct wmediumd *ctx, double snr,
 
 int use_fixed_random_value(struct wmediumd *ctx)
 {
-	return ctx->error_prob_matrix != NULL || ctx->station_err_matrix != NULL;
+	return ctx->error_prob_matrix != NULL;
 }
 
 #define FREQ_1CH (2.412e9)		// [Hz]
@@ -116,7 +116,6 @@ static int calc_path_loss_log_distance(void *model_param,
 	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
 	 */
 	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + param->Xg;
-
 	return PL;
 }
 
@@ -212,9 +211,7 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 	if (strncmp(path_loss_model_name, "log_distance",
 		    sizeof("log_distance")) == 0) {
 		struct log_distance_model_param *param;
-
 		ctx->calc_path_loss = calc_path_loss_log_distance;
-
 		param = malloc(sizeof(*param));
 		if (!param) {
 			w_flogf(ctx, LOG_ERR, stderr,
@@ -380,6 +377,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	ctx->num_stas = count_ids;
 
 	enable_interference = config_lookup(cf, "ifaces.enable_interference");
+
 	if (enable_interference &&
 	    config_setting_get_bool(enable_interference)) {
 		ctx->intf = calloc(ctx->num_stas * ctx->num_stas,
@@ -419,14 +417,14 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	for (i = 0; i < count_ids * count_ids; i++)
 		ctx->snr_matrix[i] = SNR_DEFAULT;
 
-	links = config_lookup(cf, "ifaces.links");
+    links = config_lookup(cf, "ifaces.links");
 	if (!links) {
 		model_type = config_lookup(cf, "model.type");
 		if (model_type) {
 			model_type_str = config_setting_get_string(model_type);
 			if (memcmp("snr", model_type_str, strlen("snr")) == 0) {
 				links = config_lookup(cf, "model.links");
-			} else if (memcmp("prob", model_type_str,
+       	} else if (memcmp("prob", model_type_str,
 				strlen("prob")) == 0) {
 				error_probs = config_lookup(cf, "model.links");
 			} else if (memcmp("path_loss", model_type_str,
@@ -437,8 +435,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 			}
 		}
 	}
-
-	if (per_file && error_probs) {
+    if (per_file && error_probs) {
 		w_flogf(ctx, LOG_ERR, stderr,
 			"per_file and error_probs could not be used at the same time\n");
 		goto fail;

@@ -49,6 +49,13 @@ void stop_wserver();
 int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request *request);
 
 /**
+ * Handle a position_update_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
+int handle_position_update_request(struct request_ctx *ctx, const position_update_request *request);
+
+/**
  * Handle a errprob_update_request and pass it to wmediumd
  * @param ctx The request_ctx context
  * @param request The received request
