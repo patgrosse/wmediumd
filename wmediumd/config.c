@@ -377,7 +377,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	ctx->num_stas = count_ids;
 
 	enable_interference = config_lookup(cf, "ifaces.enable_interference");
-
 	if (enable_interference &&
 	    config_setting_get_bool(enable_interference)) {
 		ctx->intf = calloc(ctx->num_stas * ctx->num_stas,
@@ -417,14 +416,14 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	for (i = 0; i < count_ids * count_ids; i++)
 		ctx->snr_matrix[i] = SNR_DEFAULT;
 
-        links = config_lookup(cf, "ifaces.links");
+	links = config_lookup(cf, "ifaces.links");
 	if (!links) {
 		model_type = config_lookup(cf, "model.type");
 		if (model_type) {
 			model_type_str = config_setting_get_string(model_type);
 			if (memcmp("snr", model_type_str, strlen("snr")) == 0) {
 				links = config_lookup(cf, "model.links");
-       	} else if (memcmp("prob", model_type_str,
+		       	} else if (memcmp("prob", model_type_str,
 				strlen("prob")) == 0) {
 				error_probs = config_lookup(cf, "model.links");
 			} else if (memcmp("path_loss", model_type_str,
@@ -435,7 +434,8 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 			}
 		}
 	}
-    if (per_file && error_probs) {
+
+	if (per_file && error_probs) {
 		w_flogf(ctx, LOG_ERR, stderr,
 			"per_file and error_probs could not be used at the same time\n");
 		goto fail;

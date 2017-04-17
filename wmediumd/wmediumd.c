@@ -966,7 +966,6 @@ int main(int argc, char *argv[])
 		w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
 	}
 	INIT_LIST_HEAD(&ctx.stations);
-
 	if (load_config(&ctx, config_file, per_file, full_dynamic))
 		return EXIT_FAILURE;
 
