@@ -46,7 +46,7 @@ LDFLAGS += $(shell $(PKG_CONFIG) --libs $(NLLIBNAME))
 CFLAGS += $(shell $(PKG_CONFIG) --cflags $(NLLIBNAME))
 
 CFLAGS+=-DVERSION_STR=$(VERSION_STR)
-LDFLAGS+=-lconfig -lpthread -levent_pthreads
+LDFLAGS+=-lconfig -lpthread
 OBJECTS=wmediumd.o wserver.o config.o per.o wmediumd_dynamic.o wserver_messages.o wserver_messages_network.o
 
 all: wmediumd 

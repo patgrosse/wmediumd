@@ -125,7 +125,7 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
     snr_update_response response;
     response.request = *request;
 
-    if (ctx->ctx->error_prob_matrix == NULL) {
+    if (ctx->ctx->snr_matrix != NULL) {
         struct station *sender = NULL;
         struct station *receiver = NULL;
         struct station *station;
