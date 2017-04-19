@@ -319,7 +319,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		ctx->per_matrix_row_num = 0;
 		ctx->error_prob_matrix = NULL;
 		ctx->get_link_snr = get_link_snr_default;
-		ctx->get_error_prob = get_error_prob_from_specific_matrix;
 		ctx->station_err_matrix = malloc(0);
 		return 0;
 	}
@@ -423,7 +422,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 			model_type_str = config_setting_get_string(model_type);
 			if (memcmp("snr", model_type_str, strlen("snr")) == 0) {
 				links = config_lookup(cf, "model.links");
-		       	} else if (memcmp("prob", model_type_str,
+			} else if (memcmp("prob", model_type_str,
 				strlen("prob")) == 0) {
 				error_probs = config_lookup(cf, "model.links");
 			} else if (memcmp("path_loss", model_type_str,
@@ -448,8 +447,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	ctx->per_matrix_row_num = 0;
 	if (per_file && read_per_file(ctx, per_file))
 		goto fail;
-	if (!per_file && !error_probs)
-		goto fail;
 
 	ctx->error_prob_matrix = NULL;
 	if (error_probs) {
@@ -470,9 +467,9 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 				default_prob);
 			if (default_prob_value < 0.0 ||
 			    default_prob_value > 1.0) {
-				w_flogf(ctx, LOG_ERR, stderr,
-					"model.default_prob should be in [0.0, 1.0]\n");
-				goto fail;
+					w_flogf(ctx, LOG_ERR, stderr,
+						"model.default_prob should be in [0.0, 1.0]\n");
+					goto fail;
 			}
 		}
 	}
@@ -492,9 +489,9 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 
 		if (start < 0 || start >= ctx->num_stas ||
 		    end < 0 || end >= ctx->num_stas) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%d]: index out of range\n",
-					start, end, snr);
-			goto fail;
+				w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%d]: index out of range\n",
+						start, end, snr);
+				goto fail;
 		}
 		ctx->snr_matrix[ctx->num_stas * start + end] = snr;
 		ctx->snr_matrix[ctx->num_stas * end + start] = snr;
@@ -512,29 +509,29 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	/* read error probabilities */
 	for (i = 0; error_probs &&
 	     i < config_setting_length(error_probs); i++) {
-		float error_prob_value;
+			float error_prob_value;
 
-		error_prob = config_setting_get_elem(error_probs, i);
-		if (config_setting_length(error_prob) != 3) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability: expected (int,int,float)\n");
-			goto fail;
-		}
+			error_prob = config_setting_get_elem(error_probs, i);
+			if (config_setting_length(error_prob) != 3) {
+				w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability: expected (int,int,float)\n");
+				goto fail;
+			}
 
-		start = config_setting_get_int_elem(error_prob, 0);
-		end = config_setting_get_int_elem(error_prob, 1);
-		error_prob_value = config_setting_get_float_elem(error_prob, 2);
+			start = config_setting_get_int_elem(error_prob, 0);
+			end = config_setting_get_int_elem(error_prob, 1);
+			error_prob_value = config_setting_get_float_elem(error_prob, 2);
 
-		if (start < 0 || start >= ctx->num_stas ||
-		    end < 0 || end >= ctx->num_stas ||
-		    error_prob_value < 0.0 || error_prob_value > 1.0) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability [%d,%d,%f]\n",
-				start, end, error_prob_value);
-			goto fail;
-		}
+			if (start < 0 || start >= ctx->num_stas ||
+				end < 0 || end >= ctx->num_stas ||
+				error_prob_value < 0.0 || error_prob_value > 1.0) {
+					w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability [%d,%d,%f]\n",
+						start, end, error_prob_value);
+					goto fail;
+			}
 
-		ctx->error_prob_matrix[ctx->num_stas * start + end] =
-		ctx->error_prob_matrix[ctx->num_stas * end + start] =
-			error_prob_value;
+			ctx->error_prob_matrix[ctx->num_stas * start + end] =
+			ctx->error_prob_matrix[ctx->num_stas * end + start] =
+				error_prob_value;
 	}
 
 	config_destroy(cf);

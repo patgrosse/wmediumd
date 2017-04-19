@@ -42,10 +42,6 @@
 #include "wmediumd_dynamic.h"
 #include "wserver_messages.h"
 
-static int index_to_rate[] = {
-	60, 90, 120, 180, 240, 360, 480, 540
-};
-
 static inline int div_round(int a, int b)
 {
 	return (a + b - 1) / b;
@@ -322,7 +318,7 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	int ack_time_usec = pkt_duration(14, index_to_rate[0]) + sifs;
+	int ack_time_usec = pkt_duration(14, index_to_rate(0)) + sifs;
 
 	/*
 	 * To determine a frame's expiration time, we compute the
@@ -371,10 +367,8 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 						 frame->data_len, station,
 						 deststa);
 		for (j = 0; j < frame->tx_rates[i].count; j++) {
-			int rate = index_to_rate[rate_idx];
-			if (rate == 0) // avoid division by zero
-				continue;
-			send_time += difs + pkt_duration(frame->data_len, rate);
+			send_time += difs + pkt_duration(frame->data_len,
+				index_to_rate(rate_idx));
 
 			retries++;
 
@@ -465,9 +459,9 @@ static int send_tx_info_frame_nl(struct wmediumd *ctx, struct frame *frame)
 		    frame->tx_rates_count * sizeof(struct hwsim_tx_rate),
 		    frame->tx_rates) ||
 	    nla_put_u64(msg, HWSIM_ATTR_COOKIE, frame->cookie)) {
-		w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
-		ret = -1;
-		goto out;
+			w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
+			ret = -1;
+			goto out;
 	}
 
 	ret = nl_send_auto_complete(sock, msg);
@@ -512,9 +506,9 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 	    nla_put(msg, HWSIM_ATTR_FRAME, data_len, data) ||
 	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, 1) ||
 	    nla_put_u32(msg, HWSIM_ATTR_SIGNAL, signal)) {
-		w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
-		ret = -1;
-		goto out;
+			w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
+			ret = -1;
+			goto out;
 	}
 
 	w_logf(ctx, LOG_DEBUG, "cloned msg dest " MAC_FMT " (radio: " MAC_FMT ") len %d\n",
@@ -747,9 +741,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			       min(tx_rates_len, sizeof(frame->tx_rates)));
 			queue_frame(ctx, sender, frame);
 		}
-out:
 		pthread_rwlock_unlock(&snr_lock);
 	}
+out:
 	return 0;
 }
 
