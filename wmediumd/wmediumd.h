@@ -158,12 +158,9 @@ double get_error_prob_from_snr(double snr, unsigned int rate_idx,
 			       int frame_len);
 bool timespec_before(struct timespec *t1, struct timespec *t2);
 int set_default_per(struct wmediumd *ctx);
-double get_error_prob_from_specific_matrix(struct wmediumd *ctx, double snr,
-										   unsigned int rate_idx,
-										   int frame_len, struct station *src,
-										   struct station *dst);
 int read_per_file(struct wmediumd *ctx, const char *file_name);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
+int index_to_rate(size_t index);
 
 #endif /* WMEDIUMD_H_ */

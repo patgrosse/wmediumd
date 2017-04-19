@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <math.h>
 
 #include "wmediumd.h"
 
@@ -40,31 +39,6 @@ struct rate rateset[] = {
 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
-#define PER_MATRIX_RATE_LEN (12)
-#define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
-#define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
-
-double get_error_prob_from_specific_matrix(struct wmediumd *ctx, double snr,
-												  unsigned int rate_idx,
-												  int frame_len, struct station *src,
-												  struct station *dst)
-{
-	if (dst == NULL) // dst is multicast. returned value will not be used.
-		return 0.0;
-	int size_idx = log2(frame_len);
-	if (size_idx < 0) {
-		size_idx = 0;
-	} else if (size_idx >= SPECIFIC_MATRIX_MAX_SIZE_IDX) {
-		size_idx = SPECIFIC_MATRIX_MAX_SIZE_IDX - 1;
-	}
-	if (rate_idx >= SPECIFIC_MATRIX_MAX_RATE_IDX) {
-		w_flogf(ctx, LOG_ERR, stderr,
-				"%s: invalid rate_idx=%d\n", __func__, rate_idx);
-		exit(EXIT_FAILURE);
-	}
-	double *specific_matrix = ctx->station_err_matrix[src->index * ctx->num_stas + dst->index];
-	return specific_matrix[size_idx * SPECIFIC_MATRIX_MAX_RATE_IDX + rate_idx];
-}
 
 double n_choose_k(double n, double k)
 {
@@ -212,20 +186,18 @@ static double get_error_prob_from_per_matrix(struct wmediumd *ctx, double snr,
 	if (signal_idx >= ctx->per_matrix_row_num)
 		return 0.0;
 
-	if (rate_idx >= PER_MATRIX_RATE_LEN) {
-		w_flogf(ctx, LOG_ERR, stderr,
-			"%s: invalid rate_idx=%d\n", __func__, rate_idx);
-		exit(EXIT_FAILURE);
-	}
+	if (rate_idx >= ARRAY_SIZE(rateset))
+		return 1.0;
 
-	return ctx->per_matrix[signal_idx * PER_MATRIX_RATE_LEN + rate_idx];
+	return ctx->per_matrix[signal_idx * ARRAY_SIZE(rateset) + rate_idx];
 }
 
 int read_per_file(struct wmediumd *ctx, const char *file_name)
 {
 	FILE *fp;
 	char line[256];
-	int signal, i;
+	int signal;
+	size_t i;
 	float *temp;
 
 	fp = fopen(file_name, "r");
@@ -257,7 +229,7 @@ int read_per_file(struct wmediumd *ctx, const char *file_name)
 		}
 
 		temp = realloc(ctx->per_matrix, sizeof(float) *
-				PER_MATRIX_RATE_LEN *
+				ARRAY_SIZE(rateset) *
 				++ctx->per_matrix_row_num);
 		if (temp == NULL) {
 			w_flogf(ctx, LOG_ERR, stderr,
@@ -266,10 +238,10 @@ int read_per_file(struct wmediumd *ctx, const char *file_name)
 		}
 		ctx->per_matrix = temp;
 
-		for (i = 0; i < PER_MATRIX_RATE_LEN; i++) {
+		for (i = 0; i < ARRAY_SIZE(rateset); i++) {
 			if (fscanf(fp, "%f", &ctx->per_matrix[
 				(signal - ctx->per_matrix_signal_min) *
-				PER_MATRIX_RATE_LEN + i]) == EOF) {
+				ARRAY_SIZE(rateset) + i]) == EOF) {
 				w_flogf(ctx, LOG_ERR, stderr,
 					"Not enough rate found\n");
 				return EXIT_FAILURE;
@@ -280,4 +252,12 @@ int read_per_file(struct wmediumd *ctx, const char *file_name)
 	ctx->get_error_prob = get_error_prob_from_per_matrix;
 
 	return EXIT_SUCCESS;
+}
+
+int index_to_rate(size_t index)
+{
+	if (index >= ARRAY_SIZE(rateset))
+		index = ARRAY_SIZE(rateset) - 1;
+
+	return rateset[index].mbps * 10;
 }
