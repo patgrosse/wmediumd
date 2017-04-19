@@ -741,9 +741,11 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			       min(tx_rates_len, sizeof(frame->tx_rates)));
 			queue_frame(ctx, sender, frame);
 		}
-	}
 out:
-	pthread_rwlock_unlock(&snr_lock);
+		pthread_rwlock_unlock(&snr_lock);
+		return 0;
+
+	}
 	return 0;
 }
 
