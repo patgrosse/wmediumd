@@ -297,12 +297,12 @@ static int get_no_fading_signal(struct wmediumd *ctx)
 int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bool full_dynamic)
 {
 	config_t cfg, *cf;
-	const config_setting_t *ids, *links, *model_type;
+	const config_setting_t *ids, *_band, *links, *model_type;
 	const config_setting_t *error_probs = NULL, *error_prob;
 	const config_setting_t *enable_interference;
 	const config_setting_t *fading_coefficient, *default_prob;
 	int count_ids, i, j;
-	int start, end, snr;
+	int start, end, snr, band;
 	struct station *station;
 	const char *model_type_str;
 	float default_prob_value = 0.0;
@@ -345,7 +345,11 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	}
 	count_ids = config_setting_length(ids);
 
-	w_logf(ctx, LOG_NOTICE, "#_if = %d\n", count_ids);
+	_band = config_lookup(cf, "ifaces.band");
+ 	band = _band ? config_setting_get_int(_band) : 2;
+ 	set_band(band);
+ 
+ 	w_logf(ctx, LOG_NOTICE, "#_if = %d, band=%d\n", count_ids, band);
 
 	/* Fill the mac_addr */
 	ctx->sta_array = malloc(sizeof(struct station *) * count_ids);
