@@ -285,6 +285,12 @@ int handle_specprob_update_request(struct request_ctx *ctx, const specprob_updat
                    LOG_PREFIX "Performing SPECPROB update: from=" MAC_FMT ", to=" MAC_FMT "\n",
                    MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr));
             double *specific_mat = malloc(sizeof(double) * SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX);
+            if (!specific_mat) {
+                w_logf(ctx->ctx, LOG_ERR, "Error during allocation of memory in handle_specprob_update_request wmediumd/wserver.c\n");
+                // should be different type of error here
+                response.update_result = WUPDATE_WRONG_MODE;
+                goto out;
+            }
             for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
                 specific_mat[i] = custom_fixed_point_to_floating_point(request->errprob[i]);
             }
@@ -294,6 +300,7 @@ int handle_specprob_update_request(struct request_ctx *ctx, const specprob_updat
             ctx->ctx->station_err_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = specific_mat;
             response.update_result = WUPDATE_SUCCESS;
         }
+out:
         pthread_rwlock_unlock(&snr_lock);
     } else {
         response.update_result = WUPDATE_WRONG_MODE;
@@ -499,9 +506,18 @@ void on_listen_event(int fd, short what, void *wctx) {
     UNUSED(fd);
     UNUSED(what);
     struct accept_context *actx = malloc(sizeof(struct accept_context));
+    if (!actx) {
+        w_logf(wctx, LOG_ERR, "Error during allocation of memory in on_listen_event wmediumd/wserver.c\n");
+        return;
+    }
     actx->wctx = wctx;
     actx->server_socket = fd;
     actx->thread = malloc(sizeof(pthread_t));
+    if (!actx->thread) {
+        w_logf(wctx, LOG_ERR, "Error during allocation of memory in on_listen_event wmediumd/wserver.c\n");
+        free(actx);
+        return;
+    }
     actx->client_socket = accept_connection(actx->server_socket);
     if (actx->client_socket < 0) {
         w_logf(actx->wctx, LOG_ERR, LOG_PREFIX "Accept failed: %s\n", strerror(errno));
