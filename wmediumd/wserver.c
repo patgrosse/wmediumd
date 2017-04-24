@@ -130,7 +130,7 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
         struct station *receiver = NULL;
         struct station *station;
 
-        pthread_rwlock_wrlock(&snr_lock);
+        pthread_rwlock_rdlock(&snr_lock);
 
         list_for_each_entry(station, &ctx->ctx->stations, list) {
             if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
@@ -174,7 +174,7 @@ int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_
         struct station *receiver = NULL;
         struct station *station;
 
-        pthread_rwlock_wrlock(&snr_lock);
+        pthread_rwlock_rdlock(&snr_lock);
 
         list_for_each_entry(station, &ctx->ctx->stations, list) {
             if (memcmp(&request->from_addr, station->addr, ETH_ALEN) == 0) {
