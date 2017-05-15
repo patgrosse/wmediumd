@@ -162,5 +162,6 @@ int read_per_file(struct wmediumd *ctx, const char *file_name);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 int index_to_rate(size_t index);
+void set_band(int band);
 
 #endif /* WMEDIUMD_H_ */
