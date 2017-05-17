@@ -150,19 +150,14 @@ static int calc_path_loss_log_distance(void *model_param,
  *
  * This function returns path loss [dBm].
  */
-static int calc_path_loss_ITU(void *model_param,
+static int calc_path_loss_itu(void *model_param,
 			  struct station *dst, struct station *src)
 {
 	struct itu_model_param *param;
 	double PL, d;
-	int N=28, nFLOORS=0, LF=0;
+	int N=28;
 
 	param = model_param;
-
-	if (nFLOORS != param->nFLOORS)
-		nFLOORS = param->nFLOORS;
-	if (LF != param->LF)
-		LF = param->LF;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
 		 (src->y - dst->y) * (src->y - dst->y));
@@ -175,7 +170,7 @@ static int calc_path_loss_ITU(void *model_param,
      * Site-Specific Validation of ITU Indoor Path Loss Model at 2.4 GHz
      * from Theofilos Chrysikos, Giannis Georgopoulos and Stavros Kotsopoulos
 	 */
-	PL = 20.0 * log10(FREQ_1CH) + N * log10(d) + LF * nFLOORS - 28;
+	PL = 20.0 * log10(FREQ_1CH) + N * log10(d) + param->LF * param->nFLOORS - 28;
 	return PL;
 }
 
@@ -307,7 +302,7 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 	else if (strncmp(path_loss_model_name, "itu",
 			sizeof("itu")) == 0) {
 		struct itu_model_param *param;
-		ctx->calc_path_loss = calc_path_loss_ITU;
+		ctx->calc_path_loss = calc_path_loss_itu;
 		param = malloc(sizeof(*param));
 		if (!param) {
 			w_flogf(ctx, LOG_ERR, stderr,
