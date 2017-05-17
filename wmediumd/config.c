@@ -59,7 +59,8 @@ static int get_link_snr_from_snr_matrix(struct wmediumd *ctx,
 }
 
 static double _get_error_prob_from_snr(struct wmediumd *ctx, double snr,
-				       unsigned int rate_idx, int frame_len,
+					   unsigned int rate_idx, u32 freq,
+					   int frame_len,
 				       struct station *src, struct station *dst)
 {
 	return get_error_prob_from_snr(snr, rate_idx, freq, frame_len);
@@ -394,7 +395,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 {
 	config_t cfg, *cf;
 	const config_setting_t *ids, *links, *model_type;
-	const config_setting_t *ids, *_band, *links, *model_type;
 	const config_setting_t *error_probs = NULL, *error_prob;
 	const config_setting_t *enable_interference;
 	const config_setting_t *fading_coefficient, *default_prob;
