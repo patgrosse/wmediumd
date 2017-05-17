@@ -318,7 +318,8 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	int ack_time_usec = pkt_duration(14, index_to_rate(0)) + sifs;
+	int ack_time_usec = pkt_duration(14, index_to_rate(0, frame->freq)) +
+			sifs;
 
 	/*
 	 * To determine a frame's expiration time, we compute the
@@ -364,11 +365,11 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 			break;
 
 		error_prob = ctx->get_error_prob(ctx, snr, rate_idx,
-						 frame->data_len, station,
-						 deststa);
+						 frame->freq, frame->data_len,
+						 station, deststa);
 		for (j = 0; j < frame->tx_rates[i].count; j++) {
 			send_time += difs + pkt_duration(frame->data_len,
-				index_to_rate(rate_idx));
+				index_to_rate(rate_idx, frame->freq));
 
 			retries++;
 
@@ -563,8 +564,9 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->sender->index, station->index);
 				rate_idx = frame->tx_rates[0].idx;
 				error_prob = ctx->get_error_prob(ctx,
-					(double)snr, rate_idx, frame->data_len,
-					frame->sender, station);
+					(double)snr, rate_idx, frame->freq,
+					frame->data_len, frame->sender,
+					station);
 
 				if (drand48() <= error_prob) {
 					w_logf(ctx, LOG_INFO, "Dropped mcast from "
@@ -712,6 +714,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 				(struct hwsim_tx_rate *)
 				nla_data(attrs[HWSIM_ATTR_TX_INFO]);
 			u64 cookie = nla_get_u64(attrs[HWSIM_ATTR_COOKIE]);
+			u32 freq;
+			freq = attrs[HWSIM_ATTR_FREQ] ?
+					nla_get_u32(attrs[HWSIM_ATTR_FREQ]) : 2412;
 
 			hdr = (struct ieee80211_hdr *)data;
 			src = hdr->addr2;
@@ -734,6 +739,7 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			frame->data_len = data_len;
 			frame->flags = flags;
 			frame->cookie = cookie;
+			frame->freq = freq;
 			frame->sender = sender;
 			frame->tx_rates_count =
 				tx_rates_len / sizeof(struct hwsim_tx_rate);

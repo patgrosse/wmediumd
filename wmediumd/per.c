@@ -12,6 +12,8 @@
 
 #include "wmediumd.h"
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+
 /* Code rates for convolutional codes */
 enum fec_rate {
 	FEC_RATE_1_2,
@@ -28,7 +30,7 @@ struct rate {
 /*
  * rate sets are defined in drivers/net/wireless/mac80211_hwsim.c#hwsim_rates.
  */
-static struct rate rateset_2GHz[] = {
+static struct rate rateset[] = {
 	/*
 	 * XXX:
 	 * For rate = 1, 2, 5.5, 11 Mbps, we will use mqam and fec of closest
@@ -47,22 +49,7 @@ static struct rate rateset_2GHz[] = {
 	{ .mbps = 480, .mqam = 64, .fec = FEC_RATE_2_3 },
 	{ .mbps = 540, .mqam = 64, .fec = FEC_RATE_3_4 },
 };
-
-static struct rate rateset_5GHz[] = {
-	{ .mbps = 60, .mqam = 2, .fec = FEC_RATE_1_2 },
-	{ .mbps = 90, .mqam = 2, .fec = FEC_RATE_3_4 },
-	{ .mbps = 120, .mqam = 4, .fec = FEC_RATE_1_2 },
-	{ .mbps = 180, .mqam = 4, .fec = FEC_RATE_3_4 },
-	{ .mbps = 240, .mqam = 16, .fec = FEC_RATE_1_2 },
-	{ .mbps = 360, .mqam = 16, .fec = FEC_RATE_3_4 },
-	{ .mbps = 480, .mqam = 64, .fec = FEC_RATE_2_3 },
-	{ .mbps = 540, .mqam = 64, .fec = FEC_RATE_3_4 },
-};
-
-static struct rate *rateset;
-static size_t rate_len;
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+static size_t rate_len = ARRAY_SIZE(rateset);
 
 static double n_choose_k(double n, double k)
 {
@@ -172,7 +159,8 @@ static double per(double ber, enum fec_rate rate, int frame_len)
 	return 1.0 - pow(1 - prob_uncorrected, 8 * frame_len);
 }
 
-double get_error_prob_from_snr(double snr, unsigned int rate_idx, int frame_len)
+double get_error_prob_from_snr(double snr, unsigned int rate_idx, u32 freq,
+							   int frame_len)
 {
 	int m;
 	enum fec_rate fec;
@@ -180,6 +168,9 @@ double get_error_prob_from_snr(double snr, unsigned int rate_idx, int frame_len)
 
 	if (snr <= 0.0)
 		return 1.0;
+
+	if (freq > 5000)
+		    rate_idx += 4;
 
 	if (rate_idx >= rate_len)
 		return 1.0;
@@ -196,7 +187,7 @@ double get_error_prob_from_snr(double snr, unsigned int rate_idx, int frame_len)
 }
 
 static double get_error_prob_from_per_matrix(struct wmediumd *ctx, double snr,
-					     unsigned int rate_idx,
+						 unsigned int rate_idx, u32 freq,
 					     int frame_len, struct station *src,
 					     struct station *dst)
 {
@@ -209,6 +200,9 @@ static double get_error_prob_from_per_matrix(struct wmediumd *ctx, double snr,
 
 	if (signal_idx >= ctx->per_matrix_row_num)
 		return 0.0;
+
+	if (freq > 5000)
+		    rate_idx += 4;
 
 	if (rate_idx >= rate_len)
 		return 1.0;
@@ -277,21 +271,12 @@ int read_per_file(struct wmediumd *ctx, const char *file_name)
 	return EXIT_SUCCESS;
 }
 
-int index_to_rate(size_t index)
+int index_to_rate(size_t index, u32 freq)
 {
+	if (freq > 5000)
+		index += 4;
 	if (index >= rate_len)
 		index = rate_len - 1;
 
 	return rateset[index].mbps;
-}
-
-void set_band(int band)
-{
-	if (band == 2) {
-		rateset = rateset_2GHz;
-		rate_len = ARRAY_SIZE(rateset_2GHz);
-	} else {
-		rateset = rateset_5GHz;
-		rate_len = ARRAY_SIZE(rateset_5GHz);
-	}
 }
