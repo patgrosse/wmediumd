@@ -64,7 +64,6 @@
 
 typedef uint8_t u8;
 typedef int32_t i32;
-typedef float f32;
 typedef uint32_t u32;
 
 /*
@@ -94,8 +93,8 @@ typedef struct __packed {
 typedef struct __packed {
     wserver_msg base;
     u8 sta_addr[ETH_ALEN];
-    f32 posX;
-    f32 posY;
+    i32 posX;
+    i32 posY;
 } position_update_request;
 
 typedef struct __packed {
