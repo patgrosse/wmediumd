@@ -155,6 +155,7 @@ static int calc_path_loss_itu(void *model_param,
 {
 	struct itu_model_param *param;
 	double PL, d;
+	double freq = FREQ_1CH / 1000000;
 	int N=28;
 
 	param = model_param;
@@ -169,8 +170,11 @@ static int calc_path_loss_itu(void *model_param,
 	 * Power Loss Coefficient Based on the Paper
      * Site-Specific Validation of ITU Indoor Path Loss Model at 2.4 GHz
      * from Theofilos Chrysikos, Giannis Georgopoulos and Stavros Kotsopoulos
+     * LF: floor penetration loss factor
+     * nFLOORS: number of floors
 	 */
-	PL = 20.0 * log10(FREQ_1CH) + N * log10(d) + param->LF * param->nFLOORS - 28;
+
+	PL = 20.0 * log10(freq) + N * log10(d) + param->LF * param->nFLOORS - 28;
 	return PL;
 }
 
