@@ -93,7 +93,7 @@ static int calc_path_loss_free_space(void *model_param,
 			  struct station *dst, struct station *src)
 {
 	double PL, d;
-	double f = src->freq;
+	double f = src->freq * pow(10,6);
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
 		 (src->y - dst->y) * (src->y - dst->y));
@@ -121,7 +121,7 @@ static int calc_path_loss_log_distance(void *model_param,
 {
 	struct log_distance_model_param *param;
 	double PL, PL0, d;
-	double f = src->freq;
+	double f = src->freq * pow(10,6);
 
 	param = model_param;
 
