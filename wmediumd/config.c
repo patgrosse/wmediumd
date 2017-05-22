@@ -93,7 +93,6 @@ static int calc_path_loss_free_space(void *model_param,
 			  struct station *dst, struct station *src)
 {
 	double PL, d;
-	double f = src->freq * pow(10,6);
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
 		 (src->y - dst->y) * (src->y - dst->y));
@@ -108,7 +107,7 @@ static int calc_path_loss_free_space(void *model_param,
 	 *
 	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
-	PL = 20.0 * log10(4.0 * M_PI * d * f / SPEED_LIGHT);
+	PL = 20.0 * log10(4.0 * M_PI * d * FREQ_1CH / SPEED_LIGHT);
 	return PL;
 }
 /*
@@ -121,7 +120,6 @@ static int calc_path_loss_log_distance(void *model_param,
 {
 	struct log_distance_model_param *param;
 	double PL, PL0, d;
-	double f = src->freq * pow(10,6);
 
 	param = model_param;
 
@@ -138,7 +136,7 @@ static int calc_path_loss_log_distance(void *model_param,
 	 *
 	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
-	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * f / SPEED_LIGHT);
+	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * FREQ_1CH / SPEED_LIGHT);
 
 	/*
 	 * Calculate signal strength with Log-distance path loss model
@@ -157,7 +155,7 @@ static int calc_path_loss_itu(void *model_param,
 {
 	struct itu_model_param *param;
 	double PL, d;
-	double f = src->freq;
+	double freq = FREQ_1CH / 1000000;
 	int N=28;
 
 	param = model_param;
@@ -175,7 +173,8 @@ static int calc_path_loss_itu(void *model_param,
      * LF: floor penetration loss factor
      * nFLOORS: number of floors
 	 */
-	PL = 20.0 * log10(f) + N * log10(d) + param->LF * param->nFLOORS - 28;
+
+	PL = 20.0 * log10(freq) + N * log10(d) + param->LF * param->nFLOORS - 28;
 	return PL;
 }
 

@@ -540,6 +540,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 		list_for_each_entry(station, &ctx->stations, list) {
 			if (memcmp(src, station->addr, ETH_ALEN) == 0)
 				continue;
+
 			if (is_multicast_ether_addr(dest)) {
 				int snr, rate_idx, signal;
 				double error_prob;
@@ -739,7 +740,6 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			frame->flags = flags;
 			frame->cookie = cookie;
 			frame->freq = freq;
-			sender->freq = freq;
 			frame->sender = sender;
 			frame->tx_rates_count =
 				tx_rates_len / sizeof(struct hwsim_tx_rate);

@@ -139,7 +139,6 @@ struct station {
 	double x, y;			/* position of the station [m] */
 	double dir_x, dir_y;		/* direction of the station [meter per MOVE_INTERVAL] */
 	int tx_power;			/* transmission power [dBm] */
-	double freq;
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
 };
