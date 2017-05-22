@@ -95,8 +95,8 @@ void hton_snr_update_response(snr_update_response *elem) {
 
 void hton_position_update_request(position_update_request *elem) {
     hton_base(&elem->base);
-    htoni_wrapper(&elem->posX);
-    htoni_wrapper(&elem->posY);
+    htoni_wrapper((int32_t*)&elem->posX);
+    htoni_wrapper((int32_t*)&elem->posY);
 }
 
 void hton_position_update_response(position_update_response *elem) {
@@ -170,8 +170,8 @@ void ntoh_snr_update_response(snr_update_response *elem) {
 
 void ntoh_position_update_request(position_update_request *elem) {
     ntoh_base(&elem->base);
-    ntohi_wrapper(&elem->posX);
-    ntohi_wrapper(&elem->posY);
+    ntohi_wrapper((int32_t*)&elem->posX);
+    ntohi_wrapper((int32_t*)&elem->posY);
 }
 
 void ntoh_position_update_response(position_update_response *elem) {

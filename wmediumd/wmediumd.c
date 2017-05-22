@@ -741,6 +741,7 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			frame->cookie = cookie;
 			frame->freq = freq;
 			frame->sender = sender;
+			sender->freq = freq;
 			frame->tx_rates_count =
 				tx_rates_len / sizeof(struct hwsim_tx_rate);
 			memcpy(frame->tx_rates, tx_rates,
