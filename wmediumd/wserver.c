@@ -207,6 +207,47 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
     return ret;
 }
 
+int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_request *request) {
+    txpower_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->tx_power = request->txpower_;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing TxPower update: for=" MAC_FMT ", txpower=%d\n",
+			   MAC_ARGS(request->sta_addr), request->txpower_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
+					ctx->ctx->sta_array[start]->tx_power - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, txpower_update_response);
+    return ret;
+}
+
 int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request) {
     errprob_update_response response;
     response.request = *request;
@@ -463,6 +504,13 @@ int receive_handle_request(struct request_ctx *ctx) {
         } else {
             return handle_position_update_request(ctx, &request);
         }
+    } else if (recv_type == WSERVER_TXPOWER_UPDATE_REQUEST_TYPE) {
+		txpower_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, txpower_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_txpower_update_request(ctx, &request);
+		}
     } else {
         return -1;
     }

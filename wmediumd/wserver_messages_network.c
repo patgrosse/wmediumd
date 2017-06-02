@@ -104,6 +104,16 @@ void hton_position_update_response(position_update_response *elem) {
     hton_position_update_request(&elem->request);
 }
 
+void hton_txpower_update_request(txpower_update_request *elem) {
+    hton_base(&elem->base);
+    htoni_wrapper((int32_t*)&elem->txpower_);
+}
+
+void hton_txpower_update_response(txpower_update_response *elem) {
+    hton_base(&elem->base);
+    hton_txpower_update_request(&elem->request);
+}
+
 void hton_errprob_update_request(errprob_update_request *elem) {
     hton_base(&elem->base);
     htonu_wrapper(&elem->errprob);
@@ -177,6 +187,16 @@ void ntoh_position_update_request(position_update_request *elem) {
 void ntoh_position_update_response(position_update_response *elem) {
     ntoh_base(&elem->base);
     ntoh_position_update_request(&elem->request);
+}
+
+void ntoh_txpower_update_request(txpower_update_request *elem) {
+    ntoh_base(&elem->base);
+    ntohi_wrapper((int32_t*)&elem->txpower_);
+}
+
+void ntoh_txpower_update_response(txpower_update_response *elem) {
+    ntoh_base(&elem->base);
+    ntoh_txpower_update_request(&elem->request);
 }
 
 void ntoh_errprob_update_request(errprob_update_request *elem) {
