@@ -180,11 +180,12 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
 				sender = station;
 				sender->x = request->posX;
 				sender->y = request->posY;
+				sender->z = request->posZ;
 			}
         }
 
-		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Position update: for=" MAC_FMT ", position=%f,%f\n",
-			   MAC_ARGS(request->sta_addr), request->posX, request->posY);
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Position update: for=" MAC_FMT ", position=%f,%f,%f\n",
+			   MAC_ARGS(request->sta_addr), request->posX, request->posY, request->posZ);
 
 		for (start = 0; start < ctx->ctx->num_stas; start++) {
 			for (end = 0; end < ctx->ctx->num_stas; end++) {
@@ -194,7 +195,7 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
 				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
-					ctx->ctx->sta_array[start]->tx_power - path_loss - NOISE_LEVEL;
+						(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
 			}
 		}
 		response.update_result = WUPDATE_SUCCESS;
@@ -235,7 +236,7 @@ int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
 				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
-					ctx->ctx->sta_array[start]->tx_power - path_loss - NOISE_LEVEL;
+						(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
 			}
 		}
 		response.update_result = WUPDATE_SUCCESS;
@@ -247,6 +248,48 @@ int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_
     int ret = wserver_send_msg(ctx->sock_fd, &response, txpower_update_response);
     return ret;
 }
+
+int handle_gain_update_request(struct request_ctx *ctx, const gain_update_request *request) {
+	gain_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->gain = request->gain_;
+			}
+        }
+
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Gain update: for=" MAC_FMT ", gain=%d\n",
+			   MAC_ARGS(request->sta_addr), request->gain_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
+					(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, gain_update_response);
+    return ret;
+}
+
 
 int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request) {
     errprob_update_response response;
@@ -510,6 +553,13 @@ int receive_handle_request(struct request_ctx *ctx) {
 			return parse_recv_msg_rest_error(ctx->ctx, ret);
 		} else {
 			return handle_txpower_update_request(ctx, &request);
+		}
+    } else if (recv_type == WSERVER_GAIN_UPDATE_REQUEST_TYPE) {
+		gain_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, gain_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_gain_update_request(ctx, &request);
 		}
     } else {
         return -1;

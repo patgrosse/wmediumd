@@ -56,6 +56,8 @@
 #define WSERVER_POSITION_UPDATE_RESPONSE_TYPE 14
 #define WSERVER_TXPOWER_UPDATE_REQUEST_TYPE 15
 #define WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE 16
+#define WSERVER_GAIN_UPDATE_REQUEST_TYPE 17
+#define WSERVER_GAIN_UPDATE_RESPONSE_TYPE 18
 
 #define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
 #define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
@@ -98,6 +100,7 @@ typedef struct __packed {
     u8 sta_addr[ETH_ALEN];
     f32 posX;
     f32 posY;
+    f32 posZ;
 } position_update_request;
 
 typedef struct __packed {
@@ -117,6 +120,18 @@ typedef struct __packed {
     txpower_update_request request;
     u8 update_result;
 } txpower_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    i32 gain_;
+} gain_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    gain_update_request request;
+    u8 update_result;
+} gain_update_response;
 
 typedef struct __packed {
     wserver_msg base;
@@ -227,6 +242,10 @@ int send_txpower_update_request(int sock, const txpower_update_request *elem);
 
 int send_txpower_update_response(int sock, const txpower_update_response *elem);
 
+int send_gain_update_request(int sock, const gain_update_request *elem);
+
+int send_gain_update_response(int sock, const gain_update_response *elem);
+
 int send_errprob_update_request(int sock, const errprob_update_request *elem);
 
 int send_errprob_update_response(int sock, const errprob_update_response *elem);
@@ -258,6 +277,10 @@ int recv_position_update_response(int sock, position_update_response *elem);
 int recv_txpower_update_request(int sock, txpower_update_request *elem);
 
 int recv_txpower_update_response(int sock, txpower_update_response *elem);
+
+int recv_gain_update_request(int sock, gain_update_request *elem);
+
+int recv_gain_update_response(int sock, gain_update_response *elem);
 
 int recv_errprob_update_request(int sock, errprob_update_request *elem);
 

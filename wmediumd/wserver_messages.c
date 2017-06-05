@@ -63,6 +63,14 @@ int send_txpower_update_response(int sock, const txpower_update_response *elem) 
     align_send_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
 }
 
+int send_gain_update_request(int sock, const gain_update_request *elem) {
+    align_send_msg(sock, elem, gain_update_request, WSERVER_GAIN_UPDATE_REQUEST_TYPE)
+}
+
+int send_gain_update_response(int sock, const gain_update_response *elem) {
+    align_send_msg(sock, elem, gain_update_response, WSERVER_GAIN_UPDATE_RESPONSE_TYPE)
+}
+
 int send_errprob_update_request(int sock, const errprob_update_request *elem) {
     align_send_msg(sock, elem, errprob_update_request, WSERVER_ERRPROB_UPDATE_REQUEST_TYPE)
 }
@@ -125,6 +133,14 @@ int recv_txpower_update_request(int sock, txpower_update_request *elem) {
 
 int recv_txpower_update_response(int sock, txpower_update_response *elem) {
     align_recv_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_gain_update_request(int sock, gain_update_request *elem) {
+    align_recv_msg(sock, elem, gain_update_request, WSERVER_GAIN_UPDATE_REQUEST_TYPE)
+}
+
+int recv_gain_update_response(int sock, gain_update_response *elem) {
+    align_recv_msg(sock, elem, gain_update_response, WSERVER_GAIN_UPDATE_RESPONSE_TYPE)
 }
 
 int recv_errprob_update_request(int sock, errprob_update_request *elem) {
@@ -210,6 +226,10 @@ ssize_t get_msg_size_by_type(int type) {
 			return sizeof(txpower_update_request);
 		case WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE:
 			return sizeof(txpower_update_response);
+		case WSERVER_GAIN_UPDATE_REQUEST_TYPE:
+			return sizeof(gain_update_request);
+		case WSERVER_GAIN_UPDATE_RESPONSE_TYPE:
+			return sizeof(gain_update_response);
         default:
             return -1;
     }

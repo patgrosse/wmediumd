@@ -201,7 +201,7 @@ static void recalc_path_loss(struct wmediumd *ctx)
 			path_loss = ctx->calc_path_loss(ctx->path_loss_param,
 				ctx->sta_array[end], ctx->sta_array[start]);
 			ctx->snr_matrix[ctx->num_stas * start + end] =
-				ctx->sta_array[start]->tx_power - path_loss -
+				ctx->sta_array[start]->tx_power - ctx->sta_array[start]->gain - path_loss -
 				NOISE_LEVEL;
 		}
 	}
@@ -346,13 +346,14 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 
 	list_for_each_entry(station, &ctx->stations, list) {
 		position = config_setting_get_elem(positions, station->index);
-		if (config_setting_length(position) != 2) {
+		if (config_setting_length(position) != 3) {
 			w_flogf(ctx, LOG_ERR, stderr,
-				"Invalid position: expected (double,double)\n");
+				"Invalid position: expected (double,double,double)\n");
 			return -EINVAL;
 		}
 		station->x = config_setting_get_float_elem(position, 0);
 		station->y = config_setting_get_float_elem(position, 1);
+		station->z = config_setting_get_float_elem(position, 2);
 
 		if (directions) {
 			direction = config_setting_get_elem(directions,
@@ -474,6 +475,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		memcpy(station->addr, addr, ETH_ALEN);
 		memcpy(station->hwaddr, addr, ETH_ALEN);
 		station->tx_power = SNR_DEFAULT;
+		station->gain = GAIN_DEFAULT;
 		station_init_queues(station);
 		list_add_tail(&station->list, &ctx->stations);
 		ctx->sta_array[i] = station;

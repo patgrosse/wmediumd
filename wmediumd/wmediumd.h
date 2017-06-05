@@ -100,6 +100,7 @@ enum {
 #define VERSION_NR 1
 
 #define SNR_DEFAULT 30
+#define GAIN_DEFAULT 0
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -136,9 +137,10 @@ struct station {
 	int index;
 	u8 addr[ETH_ALEN];		/* virtual interface mac address */
 	u8 hwaddr[ETH_ALEN];		/* hardware address of hwsim radio */
-	double x, y;			/* position of the station [m] */
+	double x, y, z;			/* position of the station [m] */
 	double dir_x, dir_y;		/* direction of the station [meter per MOVE_INTERVAL] */
 	int tx_power;			/* transmission power [dBm] */
+	int gain;			/* Gain [dBm] */
 	double freq;			/* frequency [Mhz] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
