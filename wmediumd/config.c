@@ -203,7 +203,7 @@ static void recalc_path_loss(struct wmediumd *ctx)
 
 			path_loss = ctx->calc_path_loss(ctx->path_loss_param,
 				ctx->sta_array[end], ctx->sta_array[start]);
-			gains = ctx->sta_array[start]->tx_power + ctx->sta_array[start]->gain + ctx->sta_array[start]->gain;
+			gains = ctx->sta_array[start]->tx_power + ctx->sta_array[start]->gain + ctx->sta_array[end]->gain;
 			ctx->snr_matrix[ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 		}
 	}
