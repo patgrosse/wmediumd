@@ -170,7 +170,7 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
     response.request = *request;
     struct station *sender = NULL;
     struct station *station;
-    int start, end, path_loss;
+    int start, end, path_loss, gains;
 
     if (ctx->ctx->error_prob_matrix == NULL) {
         pthread_rwlock_wrlock(&snr_lock);
@@ -194,8 +194,8 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
 
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
-				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
-						(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 			}
 		}
 		response.update_result = WUPDATE_SUCCESS;
@@ -213,7 +213,7 @@ int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_
     response.request = *request;
     struct station *sender = NULL;
     struct station *station;
-    int start, end, path_loss;
+    int start, end, path_loss, gains;
 
     if (ctx->ctx->error_prob_matrix == NULL) {
         pthread_rwlock_wrlock(&snr_lock);
@@ -235,8 +235,8 @@ int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_
 
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
-				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
-						(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 			}
 		}
 		response.update_result = WUPDATE_SUCCESS;
@@ -254,7 +254,7 @@ int handle_gain_update_request(struct request_ctx *ctx, const gain_update_reques
     response.request = *request;
     struct station *sender = NULL;
     struct station *station;
-    int start, end, path_loss;
+    int start, end, path_loss, gains;
 
     if (ctx->ctx->error_prob_matrix == NULL) {
         pthread_rwlock_wrlock(&snr_lock);
@@ -276,8 +276,8 @@ int handle_gain_update_request(struct request_ctx *ctx, const gain_update_reques
 
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
-				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] =
-					(ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain) - path_loss - NOISE_LEVEL;
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 			}
 		}
 		response.update_result = WUPDATE_SUCCESS;
