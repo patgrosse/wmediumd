@@ -99,7 +99,8 @@ static int calc_path_loss_free_space(void *model_param,
 		f = FREQ_1CH;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
-		 (src->y - dst->y) * (src->y - dst->y));
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
 
 	/*
 	 * Calculate PL0 with Free-space path loss in decibels
@@ -132,7 +133,8 @@ static int calc_path_loss_log_distance(void *model_param,
 	param = model_param;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
-		 (src->y - dst->y) * (src->y - dst->y));
+		 (src->y - dst->y) * (src->y - dst->y) +
+		 (src->z - dst->z) * (src->z - dst->z));
 
 	/*
 	 * Calculate PL0 with Free-space path loss in decibels
@@ -172,7 +174,8 @@ static int calc_path_loss_itu(void *model_param,
 	param = model_param;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
-		 (src->y - dst->y) * (src->y - dst->y));
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
 
 	if (d>16)
 		N=38;
@@ -191,7 +194,7 @@ static int calc_path_loss_itu(void *model_param,
 
 static void recalc_path_loss(struct wmediumd *ctx)
 {
-	int start, end, path_loss;
+	int start, end, path_loss, gains;
 
 	for (start = 0; start < ctx->num_stas; start++) {
 		for (end = 0; end < ctx->num_stas; end++) {
@@ -200,9 +203,8 @@ static void recalc_path_loss(struct wmediumd *ctx)
 
 			path_loss = ctx->calc_path_loss(ctx->path_loss_param,
 				ctx->sta_array[end], ctx->sta_array[start]);
-			ctx->snr_matrix[ctx->num_stas * start + end] =
-				ctx->sta_array[start]->tx_power - ctx->sta_array[start]->gain - path_loss -
-				NOISE_LEVEL;
+			gains = ctx->sta_array[start]->tx_power + ctx->sta_array[start]->gain + ctx->sta_array[start]->gain;
+			ctx->snr_matrix[ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 		}
 	}
 }
