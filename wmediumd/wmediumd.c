@@ -397,7 +397,11 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 			send_time += ack_time_usec;
 		}
 	}
-
+	/* still have to check it! is_acked = False
+	 * causes incosistency with some connections e.g.
+	 * when using wifi-direct.
+         */
+	is_acked = true;
 	if (is_acked) {
 		frame->tx_rates[i-1].count = j + 1;
 		for (; i < frame->tx_rates_count; i++) {
