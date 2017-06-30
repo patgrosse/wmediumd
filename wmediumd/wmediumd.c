@@ -504,7 +504,7 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 	if (nla_put(msg, HWSIM_ATTR_ADDR_RECEIVER, ETH_ALEN,
 		    dst->hwaddr) ||
 	    nla_put(msg, HWSIM_ATTR_FRAME, data_len, data) ||
-	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, 1) ||
+	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, rate_idx) ||
 	    nla_put_u32(msg, HWSIM_ATTR_SIGNAL, signal)) {
 			w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
 			ret = -1;
@@ -540,8 +540,9 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 			if (memcmp(src, station->addr, ETH_ALEN) == 0)
 				continue;
 
+			int rate_idx;
 			if (is_multicast_ether_addr(dest)) {
-				int snr, rate_idx, signal;
+				int snr, signal;
 				double error_prob;
 
 				/*
@@ -577,18 +578,18 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
-						      1, signal);
+							  rate_idx, signal);
 
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
-
+				rate_idx = frame->tx_rates[0].idx;
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
-						      1, frame->signal);
+							  rate_idx, frame->signal);
 			}
 		}
 	} else
