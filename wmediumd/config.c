@@ -93,7 +93,7 @@ static int calc_path_loss_free_space(void *model_param,
 			  struct station *dst, struct station *src)
 {
 	struct free_space_model_param *param;
-	double PL, d;
+	double PL, d, denominator, numerator, lambda;
 	double f = src->freq * pow(10,6);
 
 	if (f < 0.1)
@@ -115,7 +115,10 @@ static int calc_path_loss_free_space(void *model_param,
 	 *
 	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
-	PL = 20.0 * log10(4.0 * M_PI * d * param->sL * f / SPEED_LIGHT);
+	lambda = SPEED_LIGHT / f;
+	denominator = pow(lambda, 2);
+	numerator = pow((4.0 * M_PI * d), 2) * param->sL;
+	PL = 10.0 * log10(numerator / denominator);
 	return PL;
 }
 /*
