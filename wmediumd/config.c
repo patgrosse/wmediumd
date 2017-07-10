@@ -92,11 +92,14 @@ int use_fixed_random_value(struct wmediumd *ctx)
 static int calc_path_loss_free_space(void *model_param,
 			  struct station *dst, struct station *src)
 {
+	struct free_space_model_param *param;
 	double PL, d;
 	double f = src->freq * pow(10,6);
 
 	if (f < 0.1)
 		f = FREQ_1CH;
+
+	param = model_param;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
 			 (src->y - dst->y) * (src->y - dst->y) +
@@ -112,7 +115,7 @@ static int calc_path_loss_free_space(void *model_param,
 	 *
 	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
-	PL = 20.0 * log10(4.0 * M_PI * d * f / SPEED_LIGHT);
+	PL = 20.0 * log10(4.0 * M_PI * d * param->sL * f / SPEED_LIGHT);
 	return PL;
 }
 /*
@@ -188,7 +191,7 @@ static int calc_path_loss_itu(void *model_param,
      * nFLOORS: number of floors
 	 */
 
-	PL = 20.0 * log10(f) + N * log10(d) + param->LF * param->nFLOORS - 28;
+	PL = 20.0 * log10(f) + N * log10(d) + param->lF * param->nFLOORS - 28;
 	return PL;
 }
 
@@ -307,7 +310,7 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 	}
 	else if (strncmp(path_loss_model_name, "free_space",
 			sizeof("free_space")) == 0) {
-		struct log_distance_model_param *param;
+		struct free_space_model_param *param;
 		ctx->calc_path_loss = calc_path_loss_free_space;
 		param = malloc(sizeof(*param));
 		if (!param) {
@@ -315,6 +318,14 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 				"Out of memory(path_loss_param)\n");
 			return -EINVAL;
 		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
 	}
 	else if (strncmp(path_loss_model_name, "itu",
 			sizeof("itu")) == 0) {
@@ -334,8 +345,8 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 			return -EINVAL;
 		}
 
-		if (config_setting_lookup_int(model, "LF",
-			&param->LF) != CONFIG_TRUE) {
+		if (config_setting_lookup_int(model, "lF",
+			&param->lF) != CONFIG_TRUE) {
 			w_flogf(ctx, LOG_ERR, stderr, "LF not found\n");
 			return -EINVAL;
 		}

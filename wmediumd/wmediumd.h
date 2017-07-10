@@ -210,7 +210,11 @@ struct log_distance_model_param {
 
 struct itu_model_param {
 	int nFLOORS;
-	int LF;
+	int lF;
+};
+
+struct free_space_model_param {
+	int sL;
 };
 
 struct intf_info {
