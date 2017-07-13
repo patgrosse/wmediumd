@@ -235,10 +235,32 @@ static int calc_path_loss_log_normal_shadowing(void *model_param,
 	denominator = pow(lambda, 2);
 	numerator = pow((4.0 * M_PI * ref_d), 2) * param->sL;
 	pl = 10.0 * log10(numerator / denominator);
-
 	PL = 10.0 * param->path_loss_exponent * log10(d/ref_d) + param->gRandom;
-
 	PL = - pl + PL;
+	return PL;
+}
+/*
+ * Calculate path loss based on a two ray ground model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_two_ray_ground(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct two_ray_ground_model_param *param;
+	double PL, d;
+	double f = src->freq;
+
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	param = model_param;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
+
+	PL = (src->tx_power * src->gain * dst->gain * pow(src->height,2) * pow(dst->height,2)) / (pow(d,4) * param->sL);
 	return PL;
 }
 
@@ -403,6 +425,25 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 			&param->path_loss_exponent) != CONFIG_TRUE) {
 			w_flogf(ctx, LOG_ERR, stderr,
 				"path_loss_exponent not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
+	else if (strncmp(path_loss_model_name, "two_ray_ground",
+				sizeof("two_ray_ground")) == 0) {
+		struct two_ray_ground_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_two_ray_ground;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
 			return -EINVAL;
 		}
 		ctx->path_loss_param = param;
@@ -575,6 +616,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		memcpy(station->hwaddr, addr, ETH_ALEN);
 		station->tx_power = SNR_DEFAULT;
 		station->gain = GAIN_DEFAULT;
+		station->height = HEIGHT_DEFAULT;
 		station_init_queues(station);
 		list_add_tail(&station->list, &ctx->stations);
 		ctx->sta_array[i] = station;

@@ -101,6 +101,7 @@ enum {
 
 #define SNR_DEFAULT 30
 #define GAIN_DEFAULT 0
+#define HEIGHT_DEFAULT 0
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -140,7 +141,8 @@ struct station {
 	double x, y, z;			/* position of the station [m] */
 	double dir_x, dir_y;		/* direction of the station [meter per MOVE_INTERVAL] */
 	int tx_power;			/* transmission power [dBm] */
-	int gain;			/* Gain [dBm] */
+	int gain;			/* Antenna Gain [dBm] */
+	int height;			/* Antenna Height [m] */
 	double freq;			/* frequency [Mhz] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
@@ -221,6 +223,10 @@ struct log_normal_shadowing_model_param {
 };
 
 struct free_space_model_param {
+	int sL;
+};
+
+struct two_ray_ground_model_param {
 	int sL;
 };
 
