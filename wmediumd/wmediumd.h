@@ -211,6 +211,13 @@ struct log_distance_model_param {
 struct itu_model_param {
 	int nFLOORS;
 	int lF;
+	int pL;
+};
+
+struct log_normal_shadowing_model_param {
+	int sL;
+	int gRandom;
+	double path_loss_exponent;
 };
 
 struct free_space_model_param {

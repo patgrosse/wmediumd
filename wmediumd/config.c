@@ -172,12 +172,13 @@ static int calc_path_loss_itu(void *model_param,
 	struct itu_model_param *param;
 	double PL, d;
 	double f = src->freq;
-	int N=28;
+	int N=28, pL;
 
 	if (f < 0.1)
 		f = FREQ_1CH;
 
 	param = model_param;
+	pL = param->pL;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
 			 (src->y - dst->y) * (src->y - dst->y) +
@@ -185,6 +186,8 @@ static int calc_path_loss_itu(void *model_param,
 
 	if (d>16)
 		N=38;
+	if (pL!=0)
+		N=pL;
 	/*
 	 * Calculate signal strength with ITU path loss model
 	 * Power Loss Coefficient Based on the Paper
@@ -195,6 +198,47 @@ static int calc_path_loss_itu(void *model_param,
 	 */
 
 	PL = 20.0 * log10(f) + N * log10(d) + param->lF * param->nFLOORS - 28;
+	return PL;
+}
+/*
+ * Calculate path loss based on a log-normal shadowing model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_log_normal_shadowing(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct log_normal_shadowing_model_param *param;
+	double PL, pl, d, denominator, numerator, lambda;
+	double f = src->freq;
+	int ref_d;
+
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	ref_d = 1;
+	param = model_param;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
+
+	/*
+	 * Calculate signal strength with Log-Normal Shadowing loss model
+	 * referenceDistance (m): The distance at which the reference loss is calculated
+	 * exponent: The exponent of the Path Loss propagation model, where 2 is for propagation in free space
+	 * (d) is the distance between the transmitter and the receiver (m)
+	 * gRandom is a Gaussian random variable
+	 */
+
+	lambda = SPEED_LIGHT / f;
+	denominator = pow(lambda, 2);
+	numerator = pow((4.0 * M_PI * ref_d), 2) * param->sL;
+	pl = 10.0 * log10(numerator / denominator);
+
+	PL = 10.0 * param->path_loss_exponent * log10(d/ref_d) + param->gRandom;
+
+	PL = - pl + PL;
 	return PL;
 }
 
@@ -330,6 +374,39 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		}
 		ctx->path_loss_param = param;
 	}
+	else if (strncmp(path_loss_model_name, "log_normal_shadowing",
+			sizeof("log_normal_shadowing")) == 0) {
+		struct log_normal_shadowing_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_log_normal_shadowing;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "gRandom",
+			&param->gRandom) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"gRandom not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_float(model, "path_loss_exp",
+			&param->path_loss_exponent) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"path_loss_exponent not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
 	else if (strncmp(path_loss_model_name, "itu",
 			sizeof("itu")) == 0) {
 		struct itu_model_param *param;
@@ -351,6 +428,12 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 		if (config_setting_lookup_int(model, "lF",
 			&param->lF) != CONFIG_TRUE) {
 			w_flogf(ctx, LOG_ERR, stderr, "LF not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "pL",
+			&param->pL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr, "PL not found\n");
 			return -EINVAL;
 		}
 		ctx->path_loss_param = param;
