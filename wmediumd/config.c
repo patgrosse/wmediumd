@@ -209,34 +209,36 @@ static int calc_path_loss_log_normal_shadowing(void *model_param,
 			  struct station *dst, struct station *src)
 {
 	struct log_normal_shadowing_model_param *param;
-	double PL, pl, d, denominator, numerator, lambda;
-	double f = src->freq;
-	int ref_d;
+	double PL, PL0, d;
+	double f = src->freq * pow(10,6);
 
 	if (f < 0.1)
 		f = FREQ_1CH;
 
-	ref_d = 1;
 	param = model_param;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
-			 (src->y - dst->y) * (src->y - dst->y) +
-			 (src->z - dst->z) * (src->z - dst->z));
+		 (src->y - dst->y) * (src->y - dst->y) +
+		 (src->z - dst->z) * (src->z - dst->z));
 
 	/*
-	 * Calculate signal strength with Log-Normal Shadowing loss model
-	 * referenceDistance (m): The distance at which the reference loss is calculated
-	 * exponent: The exponent of the Path Loss propagation model, where 2 is for propagation in free space
-	 * (d) is the distance between the transmitter and the receiver (m)
-	 * gRandom is a Gaussian random variable
+	 * Calculate PL0 with Free-space path loss in decibels
+	 *
+	 * 20 * log10 * (4 * M_PI * d * f / c)
+	 *   d: distance [meter]
+	 *   f: frequency [Hz]
+	 *   c: speed of light in a vacuum [meter/second]
+	 *
+	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
+	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * f / SPEED_LIGHT);
 
-	lambda = SPEED_LIGHT / f;
-	denominator = pow(lambda, 2);
-	numerator = pow((4.0 * M_PI * ref_d), 2) * param->sL;
-	pl = 10.0 * log10(numerator / denominator);
-	PL = 10.0 * param->path_loss_exponent * log10(d/ref_d) + param->gRandom;
-	PL = - pl + PL;
+	/*
+	 * Calculate signal strength with Log-distance path loss model + gRandom (Gaussian random variable)
+	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
+	 */
+	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + param->gRandom;
+	
 	return PL;
 }
 /*
