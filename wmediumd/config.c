@@ -211,6 +211,7 @@ static int calc_path_loss_log_normal_shadowing(void *model_param,
 	struct log_normal_shadowing_model_param *param;
 	double PL, PL0, d;
 	double f = src->freq * pow(10,6);
+	double gRandom = src->gRandom;
 
 	if (f < 0.1)
 		f = FREQ_1CH;
@@ -237,8 +238,7 @@ static int calc_path_loss_log_normal_shadowing(void *model_param,
 	 * Calculate signal strength with Log-distance path loss model + gRandom (Gaussian random variable)
 	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
 	 */
-	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + param->gRandom;
-	
+	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + gRandom;
 	return PL;
 }
 /*
@@ -413,13 +413,6 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 			&param->sL) != CONFIG_TRUE) {
 			w_flogf(ctx, LOG_ERR, stderr,
 				"system loss not found\n");
-			return -EINVAL;
-		}
-
-		if (config_setting_lookup_int(model, "gRandom",
-			&param->gRandom) != CONFIG_TRUE) {
-			w_flogf(ctx, LOG_ERR, stderr,
-				"gRandom not found\n");
 			return -EINVAL;
 		}
 

@@ -249,6 +249,47 @@ int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_
     return ret;
 }
 
+int handle_gaussian_random_update_request(struct request_ctx *ctx, const gaussian_random_update_request *request) {
+	gaussian_random_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss, gains;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->gRandom = request->gaussian_random_;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Gaussian Random update: for=" MAC_FMT ", gRandom=%d\n",
+			   MAC_ARGS(request->sta_addr), request->gaussian_random_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				gains = (ctx->ctx->sta_array[start]->gRandom + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, gaussian_random_update_response);
+    return ret;
+}
+
 int handle_gain_update_request(struct request_ctx *ctx, const gain_update_request *request) {
 	gain_update_response response;
     response.request = *request;
@@ -560,6 +601,13 @@ int receive_handle_request(struct request_ctx *ctx) {
 			return parse_recv_msg_rest_error(ctx->ctx, ret);
 		} else {
 			return handle_gain_update_request(ctx, &request);
+		}
+    } else if (recv_type == WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE) {
+		gaussian_random_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, gaussian_random_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_gaussian_random_update_request(ctx, &request);
 		}
     } else {
         return -1;

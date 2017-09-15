@@ -63,6 +63,13 @@ int handle_position_update_request(struct request_ctx *ctx, const position_updat
 int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_request *request);
 
 /**
+ * Handle a gaussian_random_update_request and pass it to wmediumd
+ * @param ctx The request_ctx context
+ * @param request The received request
+ */
+int handle_gaussian_random_update_request(struct request_ctx *ctx, const gaussian_random_update_request *request);
+
+/**
  * Handle a gain_update_request and pass it to wmediumd
  * @param ctx The request_ctx context
  * @param request The received request

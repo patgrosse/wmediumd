@@ -143,6 +143,7 @@ struct station {
 	int tx_power;			/* transmission power [dBm] */
 	int gain;			/* Antenna Gain [dBm] */
 	int height;			/* Antenna Height [m] */
+	double gRandom;     /* Gaussian Random */
 	double freq;			/* frequency [Mhz] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;

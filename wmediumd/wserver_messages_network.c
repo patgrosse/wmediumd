@@ -115,6 +115,16 @@ void hton_txpower_update_response(txpower_update_response *elem) {
     hton_txpower_update_request(&elem->request);
 }
 
+void hton_gaussian_random_update_request(gaussian_random_update_request *elem) {
+    hton_base(&elem->base);
+    htoni_wrapper((int32_t*)&elem->gaussian_random_);
+}
+
+void hton_gaussian_random_update_response(gaussian_random_update_response *elem) {
+    hton_base(&elem->base);
+    hton_gaussian_random_update_request(&elem->request);
+}
+
 void hton_gain_update_request(gain_update_request *elem) {
     hton_base(&elem->base);
     htoni_wrapper((int32_t*)&elem->gain_);
@@ -209,6 +219,16 @@ void ntoh_txpower_update_request(txpower_update_request *elem) {
 void ntoh_txpower_update_response(txpower_update_response *elem) {
     ntoh_base(&elem->base);
     ntoh_txpower_update_request(&elem->request);
+}
+
+void ntoh_gaussian_random_update_request(gaussian_random_update_request *elem) {
+    ntoh_base(&elem->base);
+    ntohi_wrapper((int32_t*)&elem->gaussian_random_);
+}
+
+void ntoh_gaussian_random_update_response(gaussian_random_update_response *elem) {
+    ntoh_base(&elem->base);
+    ntoh_gaussian_random_update_request(&elem->request);
 }
 
 void ntoh_gain_update_request(gain_update_request *elem) {

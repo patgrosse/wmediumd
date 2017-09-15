@@ -63,6 +63,14 @@ int send_txpower_update_response(int sock, const txpower_update_response *elem) 
     align_send_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
 }
 
+int send_gaussian_random_update_request(int sock, const gaussian_random_update_request *elem) {
+    align_send_msg(sock, elem, gaussian_random_update_request, WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE)
+}
+
+int send_gaussian_random_update_response(int sock, const gaussian_random_update_response *elem) {
+    align_send_msg(sock, elem, gaussian_random_update_response, WSERVER_GAUSSIAN_RANDOM_UPDATE_RESPONSE_TYPE)
+}
+
 int send_gain_update_request(int sock, const gain_update_request *elem) {
     align_send_msg(sock, elem, gain_update_request, WSERVER_GAIN_UPDATE_REQUEST_TYPE)
 }
@@ -133,6 +141,14 @@ int recv_txpower_update_request(int sock, txpower_update_request *elem) {
 
 int recv_txpower_update_response(int sock, txpower_update_response *elem) {
     align_recv_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_gaussian_random_update_request(int sock, gaussian_random_update_request *elem) {
+    align_recv_msg(sock, elem, gaussian_random_update_request, WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE)
+}
+
+int recv_gaussian_random_update_response(int sock, gaussian_random_update_response *elem) {
+    align_recv_msg(sock, elem, gaussian_random_update_response, WSERVER_GAUSSIAN_RANDOM_UPDATE_RESPONSE_TYPE)
 }
 
 int recv_gain_update_request(int sock, gain_update_request *elem) {
