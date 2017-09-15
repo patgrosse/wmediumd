@@ -276,7 +276,7 @@ int handle_gaussian_random_update_request(struct request_ctx *ctx, const gaussia
 
 				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
 						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
-				gains = (ctx->ctx->sta_array[start]->gRandom + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
 				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 			}
 		}

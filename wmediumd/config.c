@@ -612,6 +612,7 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		station->tx_power = SNR_DEFAULT;
 		station->gain = GAIN_DEFAULT;
 		station->height = HEIGHT_DEFAULT;
+		station->gRandom = GAUSS_RANDOM_DEFAULT;
 		station_init_queues(station);
 		list_add_tail(&station->list, &ctx->stations);
 		ctx->sta_array[i] = station;

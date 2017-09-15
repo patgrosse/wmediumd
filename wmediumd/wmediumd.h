@@ -101,6 +101,7 @@ enum {
 
 #define SNR_DEFAULT 30
 #define GAIN_DEFAULT 0
+#define GAUSS_RANDOM_DEFAULT 0
 #define HEIGHT_DEFAULT 0
 
 #include <stdint.h>
@@ -143,7 +144,7 @@ struct station {
 	int tx_power;			/* transmission power [dBm] */
 	int gain;			/* Antenna Gain [dBm] */
 	int height;			/* Antenna Height [m] */
-	double gRandom;     /* Gaussian Random */
+	int gRandom;     /* Gaussian Random */
 	double freq;			/* frequency [Mhz] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
@@ -219,7 +220,6 @@ struct itu_model_param {
 
 struct log_normal_shadowing_model_param {
 	int sL;
-	int gRandom;
 	double path_loss_exponent;
 };
 
