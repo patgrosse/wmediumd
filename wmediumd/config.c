@@ -238,7 +238,7 @@ static int calc_path_loss_log_normal_shadowing(void *model_param,
 	 * Calculate signal strength with Log-distance path loss model + gRandom (Gaussian random variable)
 	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
 	 */
-	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + gRandom;
+	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) - gRandom;
 	return PL;
 }
 /*
