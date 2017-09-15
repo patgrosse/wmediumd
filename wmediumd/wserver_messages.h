@@ -52,6 +52,16 @@
 #define WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE 10
 #define WSERVER_SPECPROB_UPDATE_REQUEST_TYPE 11
 #define WSERVER_SPECPROB_UPDATE_RESPONSE_TYPE 12
+#define WSERVER_POSITION_UPDATE_REQUEST_TYPE 13
+#define WSERVER_POSITION_UPDATE_RESPONSE_TYPE 14
+#define WSERVER_TXPOWER_UPDATE_REQUEST_TYPE 15
+#define WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE 16
+#define WSERVER_GAIN_UPDATE_REQUEST_TYPE 17
+#define WSERVER_GAIN_UPDATE_RESPONSE_TYPE 18
+#define WSERVER_HEIGHT_UPDATE_REQUEST_TYPE 19
+#define WSERVER_HEIGHT_UPDATE_RESPONSE_TYPE 20
+#define WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE 21
+#define WSERVER_GAUSSIAN_RANDOM_UPDATE_RESPONSE_TYPE 22
 
 #define SPECIFIC_MATRIX_MAX_SIZE_IDX (12)
 #define SPECIFIC_MATRIX_MAX_RATE_IDX (12)
@@ -62,6 +72,7 @@
 
 typedef uint8_t u8;
 typedef int32_t i32;
+typedef float f32;
 typedef uint32_t u32;
 
 /*
@@ -87,6 +98,68 @@ typedef struct __packed {
     snr_update_request request;
     u8 update_result;
 } snr_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    f32 posX;
+    f32 posY;
+    f32 posZ;
+} position_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    position_update_request request;
+    u8 update_result;
+} position_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    i32 txpower_;
+} txpower_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    txpower_update_request request;
+    u8 update_result;
+} txpower_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    f32 gaussian_random_;
+} gaussian_random_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    gaussian_random_update_request request;
+    u8 update_result;
+} gaussian_random_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    i32 gain_;
+} gain_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    gain_update_request request;
+    u8 update_result;
+} gain_update_response;
+
+typedef struct __packed {
+    wserver_msg base;
+    u8 sta_addr[ETH_ALEN];
+    i32 height_;
+} height_update_request;
+
+typedef struct __packed {
+    wserver_msg base;
+    height_update_request request;
+    u8 update_result;
+} height_update_response;
 
 typedef struct __packed {
     wserver_msg base;
@@ -189,6 +262,26 @@ int send_snr_update_request(int sock, const snr_update_request *elem);
 
 int send_snr_update_response(int sock, const snr_update_response *elem);
 
+int send_position_update_request(int sock, const position_update_request *elem);
+
+int send_position_update_response(int sock, const position_update_response *elem);
+
+int send_txpower_update_request(int sock, const txpower_update_request *elem);
+
+int send_txpower_update_response(int sock, const txpower_update_response *elem);
+
+int send_gaussian_random_update_request(int sock, const gaussian_random_update_request *elem);
+
+int send_gaussian_random_update_response(int sock, const gaussian_random_update_response *elem);
+
+int send_gain_update_request(int sock, const gain_update_request *elem);
+
+int send_gain_update_response(int sock, const gain_update_response *elem);
+
+int send_height_update_request(int sock, const height_update_request *elem);
+
+int send_height_update_response(int sock, const height_update_response *elem);
+
 int send_errprob_update_request(int sock, const errprob_update_request *elem);
 
 int send_errprob_update_response(int sock, const errprob_update_response *elem);
@@ -212,6 +305,26 @@ int send_station_add_response(int sock, const station_add_response *elem);
 int recv_snr_update_request(int sock, snr_update_request *elem);
 
 int recv_snr_update_response(int sock, snr_update_response *elem);
+
+int recv_position_update_request(int sock, position_update_request *elem);
+
+int recv_position_update_response(int sock, position_update_response *elem);
+
+int recv_txpower_update_request(int sock, txpower_update_request *elem);
+
+int recv_txpower_update_response(int sock, txpower_update_response *elem);
+
+int recv_gaussian_random_update_request(int sock, gaussian_random_update_request *elem);
+
+int recv_gaussian_random_update_response(int sock, gaussian_random_update_response *elem);
+
+int recv_gain_update_request(int sock, gain_update_request *elem);
+
+int recv_gain_update_response(int sock, gain_update_response *elem);
+
+int recv_height_update_request(int sock, height_update_request *elem);
+
+int recv_height_update_response(int sock, height_update_response *elem);
 
 int recv_errprob_update_request(int sock, errprob_update_request *elem);
 

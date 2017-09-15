@@ -42,10 +42,6 @@
 #include "wmediumd_dynamic.h"
 #include "wserver_messages.h"
 
-static int index_to_rate[] = {
-	60, 90, 120, 180, 240, 360, 480, 540
-};
-
 static inline int div_round(int a, int b)
 {
 	return (a + b - 1) / b;
@@ -322,7 +318,8 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	int ack_time_usec = pkt_duration(14, index_to_rate[0]) + sifs;
+	int ack_time_usec = pkt_duration(14, index_to_rate(0, frame->freq)) +
+			sifs;
 
 	/*
 	 * To determine a frame's expiration time, we compute the
@@ -368,13 +365,11 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 			break;
 
 		error_prob = ctx->get_error_prob(ctx, snr, rate_idx,
-						 frame->data_len, station,
-						 deststa);
+						 frame->freq, frame->data_len,
+						 station, deststa);
 		for (j = 0; j < frame->tx_rates[i].count; j++) {
-			int rate = index_to_rate[rate_idx];
-			if (rate == 0) // avoid division by zero
-				continue;
-			send_time += difs + pkt_duration(frame->data_len, rate);
+			send_time += difs + pkt_duration(frame->data_len,
+				index_to_rate(rate_idx, frame->freq));
 
 			retries++;
 
@@ -402,7 +397,6 @@ void queue_frame(struct wmediumd *ctx, struct station *station,
 			send_time += ack_time_usec;
 		}
 	}
-
 	if (is_acked) {
 		frame->tx_rates[i-1].count = j + 1;
 		for (; i < frame->tx_rates_count; i++) {
@@ -465,9 +459,9 @@ static int send_tx_info_frame_nl(struct wmediumd *ctx, struct frame *frame)
 		    frame->tx_rates_count * sizeof(struct hwsim_tx_rate),
 		    frame->tx_rates) ||
 	    nla_put_u64(msg, HWSIM_ATTR_COOKIE, frame->cookie)) {
-		w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
-		ret = -1;
-		goto out;
+			w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
+			ret = -1;
+			goto out;
 	}
 
 	ret = nl_send_auto_complete(sock, msg);
@@ -510,11 +504,11 @@ int send_cloned_frame_msg(struct wmediumd *ctx, struct station *dst,
 	if (nla_put(msg, HWSIM_ATTR_ADDR_RECEIVER, ETH_ALEN,
 		    dst->hwaddr) ||
 	    nla_put(msg, HWSIM_ATTR_FRAME, data_len, data) ||
-	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, 1) ||
+	    nla_put_u32(msg, HWSIM_ATTR_RX_RATE, rate_idx) ||
 	    nla_put_u32(msg, HWSIM_ATTR_SIGNAL, signal)) {
-		w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
-		ret = -1;
-		goto out;
+			w_logf(ctx, LOG_ERR, "%s: Failed to fill a payload\n", __func__);
+			ret = -1;
+			goto out;
 	}
 
 	w_logf(ctx, LOG_DEBUG, "cloned msg dest " MAC_FMT " (radio: " MAC_FMT ") len %d\n",
@@ -546,8 +540,9 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 			if (memcmp(src, station->addr, ETH_ALEN) == 0)
 				continue;
 
+			int rate_idx;
 			if (is_multicast_ether_addr(dest)) {
-				int snr, rate_idx, signal;
+				int snr, signal;
 				double error_prob;
 
 				/*
@@ -569,8 +564,9 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->sender->index, station->index);
 				rate_idx = frame->tx_rates[0].idx;
 				error_prob = ctx->get_error_prob(ctx,
-					(double)snr, rate_idx, frame->data_len,
-					frame->sender, station);
+					(double)snr, rate_idx, frame->freq,
+					frame->data_len, frame->sender,
+					station);
 
 				if (drand48() <= error_prob) {
 					w_logf(ctx, LOG_INFO, "Dropped mcast from "
@@ -582,18 +578,18 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
-						      1, signal);
+							  rate_idx, signal);
 
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
-
+				rate_idx = frame->tx_rates[0].idx;
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
-						      1, frame->signal);
+							  rate_idx, frame->signal);
 			}
 		}
 	} else
@@ -718,6 +714,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 				(struct hwsim_tx_rate *)
 				nla_data(attrs[HWSIM_ATTR_TX_INFO]);
 			u64 cookie = nla_get_u64(attrs[HWSIM_ATTR_COOKIE]);
+			u32 freq;
+			freq = attrs[HWSIM_ATTR_FREQ] ?
+					nla_get_u32(attrs[HWSIM_ATTR_FREQ]) : 2412;
 
 			hdr = (struct ieee80211_hdr *)data;
 			src = hdr->addr2;
@@ -740,7 +739,9 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 			frame->data_len = data_len;
 			frame->flags = flags;
 			frame->cookie = cookie;
+			frame->freq = freq;
 			frame->sender = sender;
+			sender->freq = freq;
 			frame->tx_rates_count =
 				tx_rates_len / sizeof(struct hwsim_tx_rate);
 			memcpy(frame->tx_rates, tx_rates,
@@ -749,6 +750,8 @@ static int process_messages_cb(struct nl_msg *msg, void *arg)
 		}
 out:
 		pthread_rwlock_unlock(&snr_lock);
+		return 0;
+
 	}
 	return 0;
 }
@@ -965,7 +968,6 @@ int main(int argc, char *argv[])
 
 		w_logf(&ctx, LOG_NOTICE, "Input configuration file: %s\n", config_file);
 	}
-
 	INIT_LIST_HEAD(&ctx.stations);
 	if (load_config(&ctx, config_file, per_file, full_dynamic))
 		return EXIT_FAILURE;

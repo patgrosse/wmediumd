@@ -47,6 +47,38 @@ int send_snr_update_response(int sock, const snr_update_response *elem) {
     align_send_msg(sock, elem, snr_update_response, WSERVER_SNR_UPDATE_RESPONSE_TYPE)
 }
 
+int send_position_update_request(int sock, const position_update_request *elem) {
+    align_send_msg(sock, elem, position_update_request, WSERVER_POSITION_UPDATE_REQUEST_TYPE)
+}
+
+int send_position_update_response(int sock, const position_update_response *elem) {
+    align_send_msg(sock, elem, position_update_response, WSERVER_POSITION_UPDATE_RESPONSE_TYPE)
+}
+
+int send_txpower_update_request(int sock, const txpower_update_request *elem) {
+    align_send_msg(sock, elem, txpower_update_request, WSERVER_TXPOWER_UPDATE_REQUEST_TYPE)
+}
+
+int send_txpower_update_response(int sock, const txpower_update_response *elem) {
+    align_send_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
+}
+
+int send_gaussian_random_update_request(int sock, const gaussian_random_update_request *elem) {
+    align_send_msg(sock, elem, gaussian_random_update_request, WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE)
+}
+
+int send_gaussian_random_update_response(int sock, const gaussian_random_update_response *elem) {
+    align_send_msg(sock, elem, gaussian_random_update_response, WSERVER_GAUSSIAN_RANDOM_UPDATE_RESPONSE_TYPE)
+}
+
+int send_gain_update_request(int sock, const gain_update_request *elem) {
+    align_send_msg(sock, elem, gain_update_request, WSERVER_GAIN_UPDATE_REQUEST_TYPE)
+}
+
+int send_gain_update_response(int sock, const gain_update_response *elem) {
+    align_send_msg(sock, elem, gain_update_response, WSERVER_GAIN_UPDATE_RESPONSE_TYPE)
+}
+
 int send_errprob_update_request(int sock, const errprob_update_request *elem) {
     align_send_msg(sock, elem, errprob_update_request, WSERVER_ERRPROB_UPDATE_REQUEST_TYPE)
 }
@@ -93,6 +125,38 @@ int recv_snr_update_request(int sock, snr_update_request *elem) {
 
 int recv_snr_update_response(int sock, snr_update_response *elem) {
     align_recv_msg(sock, elem, snr_update_response, WSERVER_SNR_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_position_update_request(int sock, position_update_request *elem) {
+    align_recv_msg(sock, elem, position_update_request, WSERVER_POSITION_UPDATE_REQUEST_TYPE)
+}
+
+int recv_position_update_response(int sock, position_update_response *elem) {
+    align_recv_msg(sock, elem, position_update_response, WSERVER_POSITION_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_txpower_update_request(int sock, txpower_update_request *elem) {
+    align_recv_msg(sock, elem, txpower_update_request, WSERVER_TXPOWER_UPDATE_REQUEST_TYPE)
+}
+
+int recv_txpower_update_response(int sock, txpower_update_response *elem) {
+    align_recv_msg(sock, elem, txpower_update_response, WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_gaussian_random_update_request(int sock, gaussian_random_update_request *elem) {
+    align_recv_msg(sock, elem, gaussian_random_update_request, WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE)
+}
+
+int recv_gaussian_random_update_response(int sock, gaussian_random_update_response *elem) {
+    align_recv_msg(sock, elem, gaussian_random_update_response, WSERVER_GAUSSIAN_RANDOM_UPDATE_RESPONSE_TYPE)
+}
+
+int recv_gain_update_request(int sock, gain_update_request *elem) {
+    align_recv_msg(sock, elem, gain_update_request, WSERVER_GAIN_UPDATE_REQUEST_TYPE)
+}
+
+int recv_gain_update_response(int sock, gain_update_response *elem) {
+    align_recv_msg(sock, elem, gain_update_response, WSERVER_GAIN_UPDATE_RESPONSE_TYPE)
 }
 
 int recv_errprob_update_request(int sock, errprob_update_request *elem) {
@@ -170,6 +234,18 @@ ssize_t get_msg_size_by_type(int type) {
             return sizeof(errprob_update_request);
         case WSERVER_ERRPROB_UPDATE_RESPONSE_TYPE:
             return sizeof(errprob_update_response);
+        case WSERVER_POSITION_UPDATE_REQUEST_TYPE:
+			return sizeof(position_update_request);
+		case WSERVER_POSITION_UPDATE_RESPONSE_TYPE:
+			return sizeof(position_update_response);
+		case WSERVER_TXPOWER_UPDATE_REQUEST_TYPE:
+			return sizeof(txpower_update_request);
+		case WSERVER_TXPOWER_UPDATE_RESPONSE_TYPE:
+			return sizeof(txpower_update_response);
+		case WSERVER_GAIN_UPDATE_REQUEST_TYPE:
+			return sizeof(gain_update_request);
+		case WSERVER_GAIN_UPDATE_RESPONSE_TYPE:
+			return sizeof(gain_update_response);
         default:
             return -1;
     }

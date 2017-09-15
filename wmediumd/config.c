@@ -59,15 +59,16 @@ static int get_link_snr_from_snr_matrix(struct wmediumd *ctx,
 }
 
 static double _get_error_prob_from_snr(struct wmediumd *ctx, double snr,
-				       unsigned int rate_idx, int frame_len,
+					   unsigned int rate_idx, u32 freq,
+					   int frame_len,
 				       struct station *src, struct station *dst)
 {
-	return get_error_prob_from_snr(snr, rate_idx, frame_len);
+	return get_error_prob_from_snr(snr, rate_idx, freq, frame_len);
 }
 
 static double get_error_prob_from_matrix(struct wmediumd *ctx, double snr,
-					 unsigned int rate_idx, int frame_len,
-					 struct station *src,
+					 unsigned int rate_idx, u32 freq,
+					 int frame_len, struct station *src,
 					 struct station *dst)
 {
 	if (dst == NULL) // dst is multicast. returned value will not be used.
@@ -84,20 +85,25 @@ int use_fixed_random_value(struct wmediumd *ctx)
 #define FREQ_1CH (2.412e9)		// [Hz]
 #define SPEED_LIGHT (2.99792458e8)	// [meter/sec]
 /*
- * Calculate path loss based on a log distance model
+ * Calculate path loss based on a free-space path loss
  *
  * This function returns path loss [dBm].
  */
-static int calc_path_loss_log_distance(void *model_param,
+static int calc_path_loss_free_space(void *model_param,
 			  struct station *dst, struct station *src)
 {
-	struct log_distance_model_param *param;
-	double PL, PL0, d;
+	struct free_space_model_param *param;
+	double PL, d, denominator, numerator, lambda;
+	double f = src->freq * pow(10,6);
+
+	if (f < 0.1)
+		f = FREQ_1CH;
 
 	param = model_param;
 
 	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
-		 (src->y - dst->y) * (src->y - dst->y));
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
 
 	/*
 	 * Calculate PL0 with Free-space path loss in decibels
@@ -109,20 +115,160 @@ static int calc_path_loss_log_distance(void *model_param,
 	 *
 	 * https://en.wikipedia.org/wiki/Free-space_path_loss
 	 */
-	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * FREQ_1CH / SPEED_LIGHT);
+	lambda = SPEED_LIGHT / f;
+	denominator = pow(lambda, 2);
+	numerator = pow((4.0 * M_PI * d), 2) * param->sL;
+	PL = 10.0 * log10(numerator / denominator);
+	return PL;
+}
+/*
+ * Calculate path loss based on a log distance model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_log_distance(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct log_distance_model_param *param;
+	double PL, PL0, d;
+	double f = src->freq * pow(10,6);
+
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	param = model_param;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+		 (src->y - dst->y) * (src->y - dst->y) +
+		 (src->z - dst->z) * (src->z - dst->z));
+
+	/*
+	 * Calculate PL0 with Free-space path loss in decibels
+	 *
+	 * 20 * log10 * (4 * M_PI * d * f / c)
+	 *   d: distance [meter]
+	 *   f: frequency [Hz]
+	 *   c: speed of light in a vacuum [meter/second]
+	 *
+	 * https://en.wikipedia.org/wiki/Free-space_path_loss
+	 */
+	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * f / SPEED_LIGHT);
 
 	/*
 	 * Calculate signal strength with Log-distance path loss model
 	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
 	 */
 	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) + param->Xg;
+	return PL;
+}
+/*
+ * Calculate path loss based on a itu model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_itu(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct itu_model_param *param;
+	double PL, d;
+	double f = src->freq;
+	int N=28, pL;
 
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	param = model_param;
+	pL = param->pL;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
+
+	if (d>16)
+		N=38;
+	if (pL!=0)
+		N=pL;
+	/*
+	 * Calculate signal strength with ITU path loss model
+	 * Power Loss Coefficient Based on the Paper
+     * Site-Specific Validation of ITU Indoor Path Loss Model at 2.4 GHz
+     * from Theofilos Chrysikos, Giannis Georgopoulos and Stavros Kotsopoulos
+     * LF: floor penetration loss factor
+     * nFLOORS: number of floors
+	 */
+
+	PL = 20.0 * log10(f) + N * log10(d) + param->lF * param->nFLOORS - 28;
+	return PL;
+}
+/*
+ * Calculate path loss based on a log-normal shadowing model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_log_normal_shadowing(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct log_normal_shadowing_model_param *param;
+	double PL, PL0, d;
+	double f = src->freq * pow(10,6);
+	double gRandom = src->gRandom;
+
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	param = model_param;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+		 (src->y - dst->y) * (src->y - dst->y) +
+		 (src->z - dst->z) * (src->z - dst->z));
+
+	/*
+	 * Calculate PL0 with Free-space path loss in decibels
+	 *
+	 * 20 * log10 * (4 * M_PI * d * f / c)
+	 *   d: distance [meter]
+	 *   f: frequency [Hz]
+	 *   c: speed of light in a vacuum [meter/second]
+	 *
+	 * https://en.wikipedia.org/wiki/Free-space_path_loss
+	 */
+	PL0 = 20.0 * log10(4.0 * M_PI * 1.0 * f / SPEED_LIGHT);
+
+	/*
+	 * Calculate signal strength with Log-distance path loss model + gRandom (Gaussian random variable)
+	 * https://en.wikipedia.org/wiki/Log-distance_path_loss_model
+	 */
+	PL = PL0 + 10.0 * param->path_loss_exponent * log10(d) - gRandom;
+	return PL;
+}
+/*
+ * Calculate path loss based on a two ray ground model
+ *
+ * This function returns path loss [dBm].
+ */
+static int calc_path_loss_two_ray_ground(void *model_param,
+			  struct station *dst, struct station *src)
+{
+	struct two_ray_ground_model_param *param;
+	double PL, d;
+	double f = src->freq;
+
+	if (f < 0.1)
+		f = FREQ_1CH;
+
+	param = model_param;
+
+	d = sqrt((src->x - dst->x) * (src->x - dst->x) +
+			 (src->y - dst->y) * (src->y - dst->y) +
+			 (src->z - dst->z) * (src->z - dst->z));
+
+	PL = (src->tx_power * src->gain * dst->gain * pow(src->height,2) * pow(dst->height,2)) / (pow(d,4) * param->sL);
 	return PL;
 }
 
 static void recalc_path_loss(struct wmediumd *ctx)
 {
-	int start, end, path_loss;
+	int start, end, path_loss, gains;
 
 	for (start = 0; start < ctx->num_stas; start++) {
 		for (end = 0; end < ctx->num_stas; end++) {
@@ -131,9 +277,8 @@ static void recalc_path_loss(struct wmediumd *ctx)
 
 			path_loss = ctx->calc_path_loss(ctx->path_loss_param,
 				ctx->sta_array[end], ctx->sta_array[start]);
-			ctx->snr_matrix[ctx->num_stas * start + end] =
-				ctx->sta_array[start]->tx_power - path_loss -
-				NOISE_LEVEL;
+			gains = ctx->sta_array[start]->tx_power + ctx->sta_array[start]->gain + ctx->sta_array[end]->gain;
+			ctx->snr_matrix[ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
 		}
 	}
 }
@@ -212,9 +357,7 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 	if (strncmp(path_loss_model_name, "log_distance",
 		    sizeof("log_distance")) == 0) {
 		struct log_distance_model_param *param;
-
 		ctx->calc_path_loss = calc_path_loss_log_distance;
-
 		param = malloc(sizeof(*param));
 		if (!param) {
 			w_flogf(ctx, LOG_ERR, stderr,
@@ -235,20 +378,117 @@ static int parse_path_loss(struct wmediumd *ctx, config_t *cf)
 			return -EINVAL;
 		}
 		ctx->path_loss_param = param;
-	} else {
+	}
+	else if (strncmp(path_loss_model_name, "free_space",
+			sizeof("free_space")) == 0) {
+		struct free_space_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_free_space;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
+	else if (strncmp(path_loss_model_name, "log_normal_shadowing",
+			sizeof("log_normal_shadowing")) == 0) {
+		struct log_normal_shadowing_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_log_normal_shadowing;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_float(model, "path_loss_exp",
+			&param->path_loss_exponent) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"path_loss_exponent not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
+	else if (strncmp(path_loss_model_name, "two_ray_ground",
+				sizeof("two_ray_ground")) == 0) {
+		struct two_ray_ground_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_two_ray_ground;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "sL",
+			&param->sL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"system loss not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
+	else if (strncmp(path_loss_model_name, "itu",
+			sizeof("itu")) == 0) {
+		struct itu_model_param *param;
+		ctx->calc_path_loss = calc_path_loss_itu;
+		param = malloc(sizeof(*param));
+		if (!param) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"Out of memory(path_loss_param)\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "nFLOORS",
+			&param->nFLOORS) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr,
+				"nFLOORS not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "lF",
+			&param->lF) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr, "LF not found\n");
+			return -EINVAL;
+		}
+
+		if (config_setting_lookup_int(model, "pL",
+			&param->pL) != CONFIG_TRUE) {
+			w_flogf(ctx, LOG_ERR, stderr, "PL not found\n");
+			return -EINVAL;
+		}
+		ctx->path_loss_param = param;
+	}
+	else {
 		w_flogf(ctx, LOG_ERR, stderr, "No path loss model found\n");
 		return -EINVAL;
 	}
 
 	list_for_each_entry(station, &ctx->stations, list) {
 		position = config_setting_get_elem(positions, station->index);
-		if (config_setting_length(position) != 2) {
+		if (config_setting_length(position) != 3) {
 			w_flogf(ctx, LOG_ERR, stderr,
-				"Invalid position: expected (double,double)\n");
+				"Invalid position: expected (double,double,double)\n");
 			return -EINVAL;
 		}
 		station->x = config_setting_get_float_elem(position, 0);
 		station->y = config_setting_get_float_elem(position, 1);
+		station->z = config_setting_get_float_elem(position, 2);
 
 		if (directions) {
 			direction = config_setting_get_elem(directions,
@@ -322,7 +562,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		ctx->per_matrix_row_num = 0;
 		ctx->error_prob_matrix = NULL;
 		ctx->get_link_snr = get_link_snr_default;
-		ctx->get_error_prob = get_error_prob_from_specific_matrix;
 		ctx->station_err_matrix = malloc(0);
 		return 0;
 	}
@@ -371,6 +610,9 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 		memcpy(station->addr, addr, ETH_ALEN);
 		memcpy(station->hwaddr, addr, ETH_ALEN);
 		station->tx_power = SNR_DEFAULT;
+		station->gain = GAIN_DEFAULT;
+		station->height = HEIGHT_DEFAULT;
+		station->gRandom = GAUSS_RANDOM_DEFAULT;
 		station_init_queues(station);
 		list_add_tail(&station->list, &ctx->stations);
 		ctx->sta_array[i] = station;
@@ -451,8 +693,6 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	ctx->per_matrix_row_num = 0;
 	if (per_file && read_per_file(ctx, per_file))
 		goto fail;
-	if (!per_file && !error_probs)
-		goto fail;
 
 	ctx->error_prob_matrix = NULL;
 	if (error_probs) {
@@ -473,9 +713,9 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 				default_prob);
 			if (default_prob_value < 0.0 ||
 			    default_prob_value > 1.0) {
-				w_flogf(ctx, LOG_ERR, stderr,
-					"model.default_prob should be in [0.0, 1.0]\n");
-				goto fail;
+					w_flogf(ctx, LOG_ERR, stderr,
+						"model.default_prob should be in [0.0, 1.0]\n");
+					goto fail;
 			}
 		}
 	}
@@ -495,9 +735,9 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 
 		if (start < 0 || start >= ctx->num_stas ||
 		    end < 0 || end >= ctx->num_stas) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%d]: index out of range\n",
-					start, end, snr);
-			goto fail;
+				w_flogf(ctx, LOG_ERR, stderr, "Invalid link [%d,%d,%d]: index out of range\n",
+						start, end, snr);
+				goto fail;
 		}
 		ctx->snr_matrix[ctx->num_stas * start + end] = snr;
 		ctx->snr_matrix[ctx->num_stas * end + start] = snr;
@@ -515,29 +755,29 @@ int load_config(struct wmediumd *ctx, const char *file, const char *per_file, bo
 	/* read error probabilities */
 	for (i = 0; error_probs &&
 	     i < config_setting_length(error_probs); i++) {
-		float error_prob_value;
+			float error_prob_value;
 
-		error_prob = config_setting_get_elem(error_probs, i);
-		if (config_setting_length(error_prob) != 3) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability: expected (int,int,float)\n");
-			goto fail;
-		}
+			error_prob = config_setting_get_elem(error_probs, i);
+			if (config_setting_length(error_prob) != 3) {
+				w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability: expected (int,int,float)\n");
+				goto fail;
+			}
 
-		start = config_setting_get_int_elem(error_prob, 0);
-		end = config_setting_get_int_elem(error_prob, 1);
-		error_prob_value = config_setting_get_float_elem(error_prob, 2);
+			start = config_setting_get_int_elem(error_prob, 0);
+			end = config_setting_get_int_elem(error_prob, 1);
+			error_prob_value = config_setting_get_float_elem(error_prob, 2);
 
-		if (start < 0 || start >= ctx->num_stas ||
-		    end < 0 || end >= ctx->num_stas ||
-		    error_prob_value < 0.0 || error_prob_value > 1.0) {
-			w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability [%d,%d,%f]\n",
-				start, end, error_prob_value);
-			goto fail;
-		}
+			if (start < 0 || start >= ctx->num_stas ||
+				end < 0 || end >= ctx->num_stas ||
+				error_prob_value < 0.0 || error_prob_value > 1.0) {
+					w_flogf(ctx, LOG_ERR, stderr, "Invalid error probability [%d,%d,%f]\n",
+						start, end, error_prob_value);
+					goto fail;
+			}
 
-		ctx->error_prob_matrix[ctx->num_stas * start + end] =
-		ctx->error_prob_matrix[ctx->num_stas * end + start] =
-			error_prob_value;
+			ctx->error_prob_matrix[ctx->num_stas * start + end] =
+			ctx->error_prob_matrix[ctx->num_stas * end + start] =
+				error_prob_value;
 	}
 
 	config_destroy(cf);

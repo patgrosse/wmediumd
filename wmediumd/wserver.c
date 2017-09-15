@@ -1,5 +1,5 @@
 /*
- *	wmediumd_server - server for on-the-fly modifications for wmediumd
+ *	wfmediumd_server - server for on-the-fly modifications for wmediumd
  *	Copyright (c) 2016, Patrick Grosse <patrick.grosse@uni-muenster.de>
  *
  *	This program is free software; you can redistribute it and/or
@@ -165,6 +165,173 @@ int handle_snr_update_request(struct request_ctx *ctx, const snr_update_request 
     return ret;
 }
 
+int handle_position_update_request(struct request_ctx *ctx, const position_update_request *request) {
+    position_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss, gains;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->x = request->posX;
+				sender->y = request->posY;
+				sender->z = request->posZ;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Position update: for=" MAC_FMT ", position=%f,%f,%f\n",
+			   MAC_ARGS(request->sta_addr), request->posX, request->posY, request->posZ);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, position_update_response);
+    return ret;
+}
+
+int handle_txpower_update_request(struct request_ctx *ctx, const txpower_update_request *request) {
+    txpower_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss, gains;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->tx_power = request->txpower_;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing TxPower update: for=" MAC_FMT ", txpower=%d\n",
+			   MAC_ARGS(request->sta_addr), request->txpower_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, txpower_update_response);
+    return ret;
+}
+
+int handle_gaussian_random_update_request(struct request_ctx *ctx, const gaussian_random_update_request *request) {
+	gaussian_random_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss, gains;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->gRandom = request->gaussian_random_;
+			}
+        }
+
+		w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Gaussian Random update: for=" MAC_FMT ", gRandom=%d\n",
+			   MAC_ARGS(request->sta_addr), request->gaussian_random_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, gaussian_random_update_response);
+    return ret;
+}
+
+int handle_gain_update_request(struct request_ctx *ctx, const gain_update_request *request) {
+	gain_update_response response;
+    response.request = *request;
+    struct station *sender = NULL;
+    struct station *station;
+    int start, end, path_loss, gains;
+
+    if (ctx->ctx->error_prob_matrix == NULL) {
+        pthread_rwlock_wrlock(&snr_lock);
+
+        list_for_each_entry(station, &ctx->ctx->stations, list) {
+			if (memcmp(&request->sta_addr, station->addr, ETH_ALEN) == 0) {
+				sender = station;
+				sender->gain = request->gain_;
+			}
+        }
+
+        w_logf(ctx->ctx, LOG_NOTICE, LOG_PREFIX "Performing Gain update: for=" MAC_FMT ", gain=%d\n",
+			   MAC_ARGS(request->sta_addr), request->gain_);
+
+		for (start = 0; start < ctx->ctx->num_stas; start++) {
+			for (end = 0; end < ctx->ctx->num_stas; end++) {
+				if (start == end)
+					continue;
+
+				path_loss = ctx->ctx->calc_path_loss(ctx->ctx->path_loss_param,
+						ctx->ctx->sta_array[end], ctx->ctx->sta_array[start]);
+				gains = (ctx->ctx->sta_array[start]->tx_power + ctx->ctx->sta_array[start]->gain + ctx->ctx->sta_array[end]->gain);
+				ctx->ctx->snr_matrix[ctx->ctx->num_stas * start + end] = gains - path_loss - NOISE_LEVEL;
+			}
+		}
+		response.update_result = WUPDATE_SUCCESS;
+
+        pthread_rwlock_unlock(&snr_lock);
+    } else {
+        response.update_result = WUPDATE_WRONG_MODE;
+    }
+    int ret = wserver_send_msg(ctx->sock_fd, &response, gain_update_response);
+    return ret;
+}
+
+
 int handle_errprob_update_request(struct request_ctx *ctx, const errprob_update_request *request) {
     errprob_update_response response;
     response.request = *request;
@@ -243,6 +410,12 @@ int handle_specprob_update_request(struct request_ctx *ctx, const specprob_updat
                    LOG_PREFIX "Performing SPECPROB update: from=" MAC_FMT ", to=" MAC_FMT "\n",
                    MAC_ARGS(sender->addr), MAC_ARGS(receiver->addr));
             double *specific_mat = malloc(sizeof(double) * SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX);
+            if (!specific_mat) {
+                w_logf(ctx->ctx, LOG_ERR, "Error during allocation of memory in handle_specprob_update_request wmediumd/wserver.c\n");
+                // should be different type of error here
+                response.update_result = WUPDATE_WRONG_MODE;
+                goto out;
+            }
             for (int i = 0; i < SPECIFIC_MATRIX_MAX_SIZE_IDX * SPECIFIC_MATRIX_MAX_RATE_IDX; i++) {
                 specific_mat[i] = custom_fixed_point_to_floating_point(request->errprob[i]);
             }
@@ -252,6 +425,7 @@ int handle_specprob_update_request(struct request_ctx *ctx, const specprob_updat
             ctx->ctx->station_err_matrix[sender->index * ctx->ctx->num_stas + receiver->index] = specific_mat;
             response.update_result = WUPDATE_SUCCESS;
         }
+out:
         pthread_rwlock_unlock(&snr_lock);
     } else {
         response.update_result = WUPDATE_WRONG_MODE;
@@ -407,6 +581,34 @@ int receive_handle_request(struct request_ctx *ctx) {
         } else {
             return handle_add_request(ctx, &request);
         }
+    } else if (recv_type == WSERVER_POSITION_UPDATE_REQUEST_TYPE) {
+        position_update_request request;
+        if ((ret = wserver_recv_msg(ctx->sock_fd, &request, position_update_request))) {
+            return parse_recv_msg_rest_error(ctx->ctx, ret);
+        } else {
+            return handle_position_update_request(ctx, &request);
+        }
+    } else if (recv_type == WSERVER_TXPOWER_UPDATE_REQUEST_TYPE) {
+		txpower_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, txpower_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_txpower_update_request(ctx, &request);
+		}
+    } else if (recv_type == WSERVER_GAIN_UPDATE_REQUEST_TYPE) {
+		gain_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, gain_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_gain_update_request(ctx, &request);
+		}
+    } else if (recv_type == WSERVER_GAUSSIAN_RANDOM_UPDATE_REQUEST_TYPE) {
+		gaussian_random_update_request request;
+		if ((ret = wserver_recv_msg(ctx->sock_fd, &request, gaussian_random_update_request))) {
+			return parse_recv_msg_rest_error(ctx->ctx, ret);
+		} else {
+			return handle_gaussian_random_update_request(ctx, &request);
+		}
     } else {
         return -1;
     }
@@ -450,9 +652,18 @@ void on_listen_event(int fd, short what, void *wctx) {
     UNUSED(fd);
     UNUSED(what);
     struct accept_context *actx = malloc(sizeof(struct accept_context));
+    if (!actx) {
+        w_logf(wctx, LOG_ERR, "Error during allocation of memory in on_listen_event wmediumd/wserver.c\n");
+        return;
+    }
     actx->wctx = wctx;
     actx->server_socket = fd;
     actx->thread = malloc(sizeof(pthread_t));
+    if (!actx->thread) {
+        w_logf(wctx, LOG_ERR, "Error during allocation of memory in on_listen_event wmediumd/wserver.c\n");
+        free(actx);
+        return;
+    }
     actx->client_socket = accept_connection(actx->server_socket);
     if (actx->client_socket < 0) {
         w_logf(actx->wctx, LOG_ERR, LOG_PREFIX "Accept failed: %s\n", strerror(errno));

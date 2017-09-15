@@ -67,6 +67,22 @@ void hton_snr_update_request(snr_update_request *elem);
 
 void hton_snr_update_response(snr_update_response *elem);
 
+void hton_position_update_request(position_update_request *elem);
+
+void hton_position_update_response(position_update_response *elem);
+
+void hton_txpower_update_request(txpower_update_request *elem);
+
+void hton_txpower_update_response(txpower_update_response *elem);
+
+void hton_gaussian_random_update_request(gaussian_random_update_request *elem);
+
+void hton_gaussian_random_update_response(gaussian_random_update_response *elem);
+
+void hton_gain_update_request(gain_update_request *elem);
+
+void hton_gain_update_response(gain_update_response *elem);
+
 void hton_errprob_update_request(errprob_update_request *elem);
 
 void hton_errprob_update_response(errprob_update_response *elem);
@@ -92,6 +108,22 @@ void ntoh_base(wserver_msg *elem);
 void ntoh_snr_update_request(snr_update_request *elem);
 
 void ntoh_snr_update_response(snr_update_response *elem);
+
+void ntoh_position_update_request(position_update_request *elem);
+
+void ntoh_position_update_response(position_update_response *elem);
+
+void ntoh_txpower_update_request(txpower_update_request *elem);
+
+void ntoh_txpower_update_response(txpower_update_response *elem);
+
+void ntoh_gaussian_random_update_request(gaussian_random_update_request *elem);
+
+void ntoh_gaussian_random_update_response(gaussian_random_update_response *elem);
+
+void ntoh_gain_update_request(gain_update_request *elem);
+
+void ntoh_gain_update_response(gain_update_response *elem);
 
 void ntoh_errprob_update_request(errprob_update_request *elem);
 
